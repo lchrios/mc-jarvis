@@ -49,6 +49,29 @@ check(installed and installed.sha ~= nil, "the record stores the remote tree sha
 check(installed and installed.files ~= nil and installed.files[TARGET] ~= nil,
     "the record stores a sha per file")
 
+---------------------------------------------------------------- 1.b version
+print("[1b] the version command")
+check(__TEST.files["version.lua"] ~= nil, "version.lua installed")
+
+-- Capture what the program prints so the output is actually asserted.
+local captured = {}
+local realPrint = print
+print = function(...)
+    local parts = {}
+    for index = 1, select("#", ...) do
+        parts[#parts + 1] = tostring((select(index, ...)))
+    end
+    captured[#captured + 1] = table.concat(parts, " ")
+end
+run("version.lua")
+print = realPrint
+
+local printed = table.concat(captured, "\n")
+local expected = (remote["VERSION"]:gsub("%s+", ""))
+check(printed:find(expected, 1, true) ~= nil, "it prints the installed version (" .. expected .. ")")
+check(printed:find("main", 1, true) ~= nil, "it prints the branch")
+check(printed:find("no install record", 1, true) == nil, "it found the install record")
+
 ---------------------------------------------------------------- 2. no changes
 print("[2] nothing changed upstream")
 local localEdit = "-- edited by hand\n" .. remote[TARGET]

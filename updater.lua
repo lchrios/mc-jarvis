@@ -19,7 +19,10 @@ local DEFAULT_REF = "main"
 local STATE_FILE = "data/install.dat"
 
 --- Only these paths belong on the computer; docs and tools stay in the repo.
-local INCLUDE = { "startup.lua", "installer.lua", "updater.lua", "VERSION", "src/", "config/" }
+local INCLUDE = {
+    "startup.lua", "installer.lua", "updater.lua", "version.lua", "VERSION",
+    "src/", "config/",
+}
 
 --- Written only when missing, so an update never clobbers local settings.
 local PRESERVE = { "config/" }

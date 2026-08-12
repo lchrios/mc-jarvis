@@ -59,6 +59,7 @@ cambió, no el proyecto entero.
 | `updater -y` | Aplica sin preguntar |
 | `updater force` | Re-descarga todo, aunque no haya cambiado |
 | `updater dev` | Trabaja contra otra rama o etiqueta |
+| `version` | Qué tienes instalado, sin tocar la red |
 
 Tu `config/` y tu `data/` **no** se sobrescriben nunca. La versión instalada, la
 rama y el commit se ven en el tile **CENTRAL HUB**.
