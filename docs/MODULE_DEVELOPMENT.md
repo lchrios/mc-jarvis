@@ -146,6 +146,59 @@ Reinicia el ordenador y ya está. No se ha tocado ni una línea del núcleo.
 
 ---
 
+## 1.b Plantillas: muchas granjas, una implementación
+
+Escribir un fichero por granja no escala. Si varias máquinas se comportan igual
+y solo cambian sus periféricos y umbrales, usa una **plantilla**: un fichero que
+exporta `create(instance)` en lugar de ser un módulo.
+
+`src/modules/farm.lua` ya es una, y cubre el caso general "granja con un buffer
+de salida y control por redstone". Añadir una granja real es solo configuración:
+
+```lua
+-- config/modules.lua
+instances = {
+    {
+        id = "mob_farm",          -- id único; también el nombre de sus alias
+        template = "farm",        -- src/modules/farm.lua
+        name = "Mob Farm",
+        icon = "M",
+        pollInterval = 5,
+        settings = {
+            output  = { type = "minecraft:barrel" },     -- dónde cae la producción
+            control = { kind = "redstone", side = "back" },
+            bufferWarn = 0.90,
+            bufferClear = 0.75,
+            targetRate = 120,
+        },
+    },
+}
+```
+
+La plantilla `farm` acepta:
+
+| Ajuste | Qué hace |
+| --- | --- |
+| `output` | Matcher del contenedor de salida (`type`, `name`, `method`, `match`) |
+| `control` | `{ kind = "none" }`, `{ kind = "redstone", side }` o `{ kind = "integrator", side, match }`; `invert = true` si la granja va con la señal apagada |
+| `bufferWarn` / `bufferClear` | Umbrales con histéresis para la alerta de buffer lleno |
+| `idleAfter` / `alertWhenIdle` | Segundos sin producir para marcarla `IDLE` |
+| `targetRate` | Ritmo esperado, solo informativo |
+| `countItems` | Contar solo estos items, p. ej. `{ "minecraft:oak_log" }` |
+
+Cada instancia registra sus propios alias (`mob_farm.output`, `mob_farm.control`),
+así que dos granjas nunca se pisan y una puede estar `unavailable` sin afectar a
+la otra.
+
+> **Ojo con el ritmo**: se mide por lo que aparece en el buffer entre dos
+> lecturas. Si una tubería lo vacía al instante, el ritmo saldrá bajo. Apunta
+> `output` al buffer *antes* de la extracción. Los deltas negativos se ignoran,
+> así que sacar items nunca se lee como producción negativa.
+
+Para escribir tu propia plantilla, devuelve una tabla con `create(instance)` que
+construya y devuelva una definición de módulo normal. El registro la reconoce
+por tener `create` y la instancia por tener `template`.
+
 ## 2. Contrato del módulo
 
 Todas las funciones reciben el propio módulo como primer parámetro (`self`), así

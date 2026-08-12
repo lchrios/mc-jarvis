@@ -178,24 +178,78 @@ function registry.unregister(id)
     return true
 end
 
---- Load modules by id from `src/modules/<id>.lua`.
-function registry.load(ids, requireFn)
+--- Build a module definition from a template instance.
+-- A template is a module file exporting `create(instance)` instead of being a
+-- module itself, which is how one implementation (a farm, a reactor) can back
+-- any number of configured machines.
+local function loadInstance(instance, requireFn)
+    local templateName = instance.template
+    local ok, template = pcall(requireFn, "modules." .. templateName)
+    if not ok then
+        log.error("cannot load template '%s': %s", templateName, tostring(template))
+        return nil
+    end
+    if type(template) ~= "table" or type(template.create) ~= "function" then
+        log.error("'%s' is not a template: it has no create(instance)", templateName)
+        return nil
+    end
+
+    local created, def = pcall(template.create, instance)
+    if not created then
+        log.error("template '%s' failed for '%s': %s",
+            templateName, tostring(instance.id), tostring(def))
+        return nil
+    end
+
+    def.id = instance.id or def.id
+    def.template = templateName
+    return def
+end
+
+local function loadSingle(id, requireFn)
+    local ok, def = pcall(requireFn, "modules." .. id)
+    if not ok then
+        log.error("cannot load module '%s': %s", id, tostring(def))
+        return nil
+    end
+    if type(def) ~= "table" then
+        log.error("module '%s' did not return a table", id)
+        return nil
+    end
+    if type(def.create) == "function" and def.id == nil then
+        log.error("'%s' is a template; list it under modules.instances, not modules.enabled", id)
+        return nil
+    end
+    def.id = def.id or id
+    return def
+end
+
+--- Load modules.
+-- Entries are either a module id (`"power"`, loaded from
+-- `src/modules/power.lua`) or a template instance table
+-- (`{ id = "mob_farm", template = "farm", settings = {...} }`).
+function registry.load(entries, requireFn)
     requireFn = requireFn or require
     local loaded = {}
 
-    for _, id in ipairs(ids or {}) do
-        local ok, def = pcall(requireFn, "modules." .. id)
-        if not ok then
-            log.error("cannot load module '%s': %s", id, tostring(def))
-        elseif type(def) ~= "table" then
-            log.error("module '%s' did not return a table", id)
+    for _, entry in ipairs(entries or {}) do
+        local def
+        if type(entry) == "string" then
+            def = loadSingle(entry, requireFn)
+        elseif type(entry) == "table" and entry.template then
+            def = loadInstance(entry, requireFn)
+        elseif type(entry) == "table" and entry.id then
+            def = loadSingle(entry.id, requireFn)
         else
-            def.id = def.id or id
+            log.error("invalid module entry: %s", textutils.serialise(entry, { compact = true }))
+        end
+
+        if def then
             local okRegister, err = pcall(registry.register, def)
             if okRegister then
                 loaded[#loaded + 1] = def.id
             else
-                log.error("cannot register module '%s': %s", id, tostring(err))
+                log.error("cannot register module '%s': %s", tostring(def.id), tostring(err))
             end
         end
     end

@@ -14,6 +14,7 @@ cd tools/simulator
 npm install
 npm test                                 # run every scenario
 node run.js                              # dashboard walkthrough on an 82x25 monitor
+node run.js scenarios/farm.lua           # real farm module against a real barrel
 node run.js scenarios/resilience.lua     # no monitor + forced alert
 node run.js scenarios/modal.lua          # confirm dialog + log viewer
 node run.js scenarios/installer.lua      # install from a fake GitHub, then boot
@@ -37,8 +38,10 @@ roughly half a minute of simulated uptime.
 
 ## What it does *not* cover
 
-* Real mod peripherals. The mock only provides a monitor; adapters for ME
-  Bridge, Powah and friends must still be verified in game.
+* Real mod peripherals. The mock provides a monitor, redstone and an output
+  barrel that fills while its control side is powered (enough to drive the farm
+  module end to end); adapters for ME Bridge, Powah and friends must still be
+  verified in game.
 * Exact `window` blitting and colour output - the mock writes straight through
   to the parent terminal and records characters only, not colours.
 * Rednet between computers.

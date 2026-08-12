@@ -246,7 +246,15 @@ function app.boot(options)
     context = buildContext(options)
     moduleRegistry.setContext(context)
     moduleRegistry.watchPeripherals()
-    moduleRegistry.load(config.get("modules.enabled", {}), options.require)
+    -- Plain modules first, then template instances (farms, reactors, ...).
+    local moduleEntries = {}
+    for _, id in ipairs(config.get("modules.enabled", {})) do
+        moduleEntries[#moduleEntries + 1] = id
+    end
+    for _, instance in ipairs(config.get("modules.instances", {})) do
+        moduleEntries[#moduleEntries + 1] = instance
+    end
+    moduleRegistry.load(moduleEntries, options.require)
     moduleRegistry.setupAll()
     moduleRegistry.startAll()
 

@@ -75,6 +75,8 @@ local DEFAULTS = {
     modules = {
         -- Module ids loaded from src/modules/<id>.lua at boot.
         enabled = { "system", "demo_farm" },
+        -- Template instances: { id, template, name, icon, settings }.
+        instances = {},
         settings = {},
     },
 

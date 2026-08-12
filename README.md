@@ -62,6 +62,9 @@ terminal del ordenador.
   Se adapta a cualquier tamaño de monitor y a monitores monocromos.
 * Módulos: `system`, `power`, `storage` y `demo_farm` (granja simulada para
   probar la UI sin depender de máquinas reales).
+* Plantilla `farm`: granjas reales declaradas solo con configuración — lee el
+  cofre de salida, mide items/min, avisa cuando el buffer se llena y arranca o
+  para la granja por redstone o Redstone Integrator.
 * Adaptadores genéricos (inventarios, energía, fluidos) y esqueletos para AE2,
   Powah y Advanced Peripherals, todos con detección de capacidades.
 * Servicio de alertas con severidades y capa de red rednet lista pero apagada.

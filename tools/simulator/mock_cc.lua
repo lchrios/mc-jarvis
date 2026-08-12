@@ -225,10 +225,89 @@ function window.create(parent, x, y, w, h, visible)
 end
 
 ---------------------------------------------------------------- peripherals
+---------------------------------------------------------------- redstone
+local redstoneOutputs = {}
+redstone = {
+    getSides = function() return { "top", "bottom", "left", "right", "front", "back" } end,
+    setOutput = function(side, value) redstoneOutputs[side] = value and true or false end,
+    getOutput = function(side) return redstoneOutputs[side] == true end,
+    getInput = function() return false end,
+    setAnalogOutput = function(side, value) redstoneOutputs[side] = (value or 0) > 0 end,
+    getAnalogOutput = function(side) return redstoneOutputs[side] and 15 or 0 end,
+    getAnalogInput = function() return 0 end,
+}
+rs = redstone
+
+---------------------------------------------------------------- peripherals
+-- An output barrel that actually fills up over time while its control side is
+-- powered. This is what lets a scenario exercise the real farm module - read a
+-- container, measure a rate, hit the buffer alert - instead of fake numbers.
+local function makeFarmOutput(options)
+    options = options or {}
+    local slots = options.slots or 27
+    local capacity = slots * 64
+    local produced = 0
+    local lastAt = nil
+
+    local function advance()
+        local now = os.epoch("utc")
+        if not lastAt then lastAt = now return end
+        local elapsed = (now - lastAt) / 1000
+        lastAt = now
+        if elapsed <= 0 then return end
+        if redstone.getOutput(options.side or "back") then
+            produced = math.min(capacity, produced + (options.rate or 3) * elapsed)
+        end
+    end
+
+    local object = {}
+
+    function object.size() return slots end
+
+    function object.list()
+        advance()
+        local remaining = math.floor(produced)
+        local contents = {}
+        local slot = 1
+        while remaining > 0 and slot <= slots do
+            local count = math.min(64, remaining)
+            contents[slot] = { name = options.item or "minecraft:rotten_flesh", count = count }
+            remaining = remaining - count
+            slot = slot + 1
+        end
+        return contents
+    end
+
+    function object.getItemDetail(slot)
+        local contents = object.list()
+        return contents[slot]
+    end
+
+    function object.pushItems(_, _, count)
+        local moved = math.min(count or 64, math.floor(produced))
+        produced = produced - moved
+        return moved
+    end
+
+    function object.pullItems() return 0 end
+
+    return {
+        object = object,
+        drain = function() produced = 0 end,
+        fill = function(fraction) produced = capacity * fraction end,
+        produced = function() return produced end,
+    }
+end
+
 -- Monitor size is overridable so scenarios can check how the UI scales.
 local monitor = makeTerm(tonumber(__MONITOR_W) or 82, tonumber(__MONITOR_H) or 25, "monitor_0")
+local farmOutput = makeFarmOutput({ side = "back", rate = 4 })
 local peripherals = {
     monitor_0 = { types = { "monitor" }, object = monitor },
+    ["minecraft:barrel_0"] = {
+        types = { "inventory", "minecraft:barrel" },
+        object = farmOutput.object,
+    },
 }
 
 peripheral = {}
@@ -570,6 +649,10 @@ __TEST = {
     monitor = monitor,
     terminal = nativeTerm,
     files = files,
+    --- The simulated farm output barrel (drain/fill/produced).
+    farmOutput = farmOutput,
+    --- Current redstone output state, as the farm module left it.
+    redstone = function(side) return redstoneOutputs[side] == true end,
     queueTouch = function(x, y) queue[#queue + 1] = { "monitor_touch", "monitor_0", x, y } end,
     --- Deliver a touch as the Nth event, so timers get a chance to run first.
     touchAt = function(index, x, y) injections[index] = { "monitor_touch", "monitor_0", x, y } end,

@@ -249,6 +249,16 @@ require("modules.<id>")  ->  register  ->  setup(ctx)  ->  start()
                                           stop()
 ```
 
+Hay dos formas de declarar un módulo en `config/modules.lua`:
+
+* `enabled = { "power", ... }` — un fichero, un módulo.
+* `instances = { { id = "mob_farm", template = "farm", settings = {...} } }` —
+  una **plantilla** (`src/modules/farm.lua`, que exporta `create(instance)`)
+  instanciada tantas veces como haga falta. Es como se añaden granjas: solo
+  configuración, sin código nuevo. Cada instancia registra sus propios alias de
+  periférico (`mob_farm.output`), así que las granjas fallan de forma
+  independiente.
+
 ---
 
 ## 9. UI
