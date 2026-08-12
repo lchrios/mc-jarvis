@@ -729,7 +729,7 @@ __TEST = {
                 object.getGenerationRate = function() return 80 * index end
             end
             peripherals[(isPowah and "powah:energy_cell_" or "energy_cell_") .. index] = {
-                types = { "energy_storage", isPowah and "powah:energy_cell_basic" or "energyDetector" },
+                types = { "energy_storage", isPowah and "powah:energy_cell_basic" or "modded:energy_cell" },
                 object = object,
             }
         end

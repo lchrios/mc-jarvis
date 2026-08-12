@@ -60,6 +60,7 @@ cambió, no el proyecto entero.
 | `updater force` | Re-descarga todo, aunque no haya cambiado |
 | `updater dev` | Trabaja contra otra rama o etiqueta |
 | `version` | Qué tienes instalado, sin tocar la red |
+| `scan` | Qué periféricos ve el ordenador y qué puede leer de ellos |
 
 Tu `config/` y tu `data/` **no** se sobrescriben nunca. La versión instalada, la
 rama y el commit se ven en el tile **CENTRAL HUB**.

@@ -16,6 +16,7 @@ startup.lua              Bootstrap: cargador de módulos + arranque de core.app
 installer.lua            Trae updater.lua a un ordenador vacío y lo ejecuta
 updater.lua              Comprueba GitHub, avisa y actualiza solo lo que cambió
 version.lua              Imprime la versión instalada (sin red)
+scan.lua                 Diagnóstico de periféricos (sin red, sin BaseOS)
 baseos.version           Versión instalada (la leen startup.lua y el updater)
 config/                  Configuración (sin código de lógica)
   system.lua             Nombre, logging, UI, intervalos
