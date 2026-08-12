@@ -65,6 +65,7 @@ src/
     component.lua        Clase base de componente
     theme.lua            Paleta semántica
     base_layout.lua      Zonas de configuración -> rectángulos
+    base_links.lua       Trazado de las conexiones entre zonas
     components/          label, button, panel, progress_bar, list, modal,
                          pager, zone_tile
     screens/             dashboard, module_detail, module_list, alerts,
@@ -314,6 +315,37 @@ en `monitor_resize` / `term_resize`. Adaptaciones automáticas:
 | Menor que `system.ui.minWidth/minHeight` (45x18) | Se muestra "MONITOR TOO SMALL" con el tamaño real y el necesario |
 
 Tamaño recomendado: monitor de **3x2 bloques o mayor** (~57x24 caracteres).
+
+### Conexiones del mapa
+
+Una zona declara con qué conecta; **dónde va la línea lo calcula el sistema**,
+así que mover una sala en `config/layout.lua` nunca obliga a redibujar tuberías.
+
+```lua
+{ id = "power", module = "power", col = 1, row = 1, colSpan = 4, rowSpan = 3,
+  links = { { to = "hub", kind = "energy" } } }
+```
+
+* `ui/base_links.lua` enruta en ortogonal: sale por el borde de una caja, cruza
+  por un punto medio y entra por el borde de la otra, con una punta de flecha en
+  el destino. Es una función pura: entra la lista de rectángulos ya colocados,
+  sale una lista de celdas.
+* `ui/components/link_layer.lua` las pinta **antes** que los tiles, de modo que
+  los extremos quedan tapados por los bordes de las cajas.
+* Declarar el enlace desde los dos lados no lo duplica.
+* El color sale del estado de los dos extremos, sin configuración extra:
+
+| Estado | Cuándo | Color |
+| --- | --- | --- |
+| `active` | el módulo origen está funcionando | verde |
+| `idle` | el origen está parado o en reposo | gris |
+| `broken` | algún extremo no está disponible o dio error | rojo |
+| `unknown` | todavía no hay datos | gris oscuro |
+
+  Un enlace puede además nombrar una métrica del origen (`metric = "flow"`) para
+  distinguir "encendido" de "moviendo algo de verdad".
+* Cuando el layout declara enlaces, la separación entre tiles crece sola: con un
+  hueco de un carácter solo cabría la punta de flecha, no la línea.
 
 ### Mapa de la base
 

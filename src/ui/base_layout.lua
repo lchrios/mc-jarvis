@@ -13,13 +13,27 @@ local util = require("core.util")
 
 local baseLayout = {}
 
---- Space between tiles. `"auto"` (the default) widens the gap on big monitors,
---- where a single character of separation reads as "stuck together".
-local function resolveGap(configured, area)
-    if type(configured) == "number" then return configured end
+--- Space between tiles, horizontally and vertically.
+--
+-- `"auto"` widens the gap on big monitors, where a single character of
+-- separation reads as "stuck together", and widens it further when the layout
+-- declares links: a pipe needs room to be a line rather than just an arrowhead.
+-- Rows are scarcer than columns, so the vertical gap stays smaller.
+local function resolveGap(configured, area, hasLinks)
+    if type(configured) == "number" then return configured, configured end
+
     local smallest = math.min(area.w, area.h)
-    if smallest >= 34 then return 2 end
-    return 1
+    local base = smallest >= 34 and 2 or 1
+    if not hasLinks then return base, base end
+
+    return math.max(base, 3), math.max(base, 2)
+end
+
+local function declaresLinks(zones)
+    for _, zone in ipairs(zones) do
+        if type(zone.links) == "table" and #zone.links > 0 then return true end
+    end
+    return false
 end
 
 local function gridSpan(origin, total, index, span, count)
@@ -86,7 +100,7 @@ function baseLayout.resolve(layoutConfig, area, fallbackModuleIds)
         end
     end
 
-    local gap = resolveGap(layoutConfig.gap, area)
+    local gapX, gapY = resolveGap(layoutConfig.gap, area, declaresLinks(zones))
 
     local placed = {}
     for index, rawZone in ipairs(zones) do
@@ -111,8 +125,8 @@ function baseLayout.resolve(layoutConfig, area, fallbackModuleIds)
             rect = { x = zx, y = zy, w = zw, h = zh }
 
             -- Breathing room between tiles, but never at the cost of legibility.
-            if gap > 0 and zw - gap >= 4 then rect.w = zw - gap end
-            if gap > 0 and zh - gap >= 3 then rect.h = zh - gap end
+            if gapX > 0 and zw - gapX >= 4 then rect.w = zw - gapX end
+            if gapY > 0 and zh - gapY >= 3 then rect.h = zh - gapY end
         end
 
         -- Clip to the content area so a bad config cannot draw off screen.

@@ -183,6 +183,35 @@ Todo vive en `config/`, sin lógica:
 Mover una sala del plano, renombrar una zona o añadir una habitación es editar
 `config/layout.lua`. Nada más.
 
+### El mapa de la base
+
+El dashboard es un plano: cajas que colocas tú y tuberías que se trazan solas.
+
+```
++---------------+   +----------------+   +---------------+
+|    POWER      |   |  CENTRAL HUB   |   |    STORAGE    |
+|   NO DEVICE   |==>|     ONLINE     |<==|     LOCAL     |
++---------------+   +----------------+   +---------------+
+                             ^
+                             |
+                    +----------------+
+                    |   DEMO FARM    |
+                    |    STOPPED     |
+                    +----------------+
+```
+
+Declaras la conexión, no el recorrido:
+
+```lua
+{ id = "power", label = "POWER", module = "power",
+  col = 1, row = 1, colSpan = 4, rowSpan = 3,
+  links = { { to = "hub", kind = "energy" } } },
+```
+
+Mueves la zona y la tubería la sigue. El color dice qué pasa: **verde** fluyendo,
+**gris** parado, **rojo** algún extremo caído. Así un nodo que se cae se ve en el
+plano, no solo en su tile.
+
 ## Documentación
 
 * [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — estructura, flujo de eventos,

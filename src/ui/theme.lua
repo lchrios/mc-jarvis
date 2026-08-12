@@ -116,6 +116,10 @@ theme.chars = {
     cornerBottomRight = "+",
     gaugeFilled = " ",
     gaugeEmpty = " ",
+    -- Pipework on the base map, deliberately unlike the box borders.
+    linkHorizontal = "=",
+    linkVertical = "|",
+    linkCorner = "+",
     arrowLeft = "<",
     arrowRight = ">",
     arrowUp = "^",

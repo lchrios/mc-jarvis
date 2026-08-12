@@ -8,8 +8,10 @@ local class = require("core.class")
 local bus = require("core.event_bus")
 local Screen = require("ui.screen")
 local ZoneTile = require("ui.components.zone_tile")
+local LinkLayer = require("ui.components.link_layer")
 local Label = require("ui.components.label")
 local baseLayout = require("ui.base_layout")
+local baseLinks = require("ui.base_links")
 local registry = require("modules.registry")
 local config = require("core.config")
 
@@ -74,6 +76,14 @@ function Dashboard:onLayout(x, y, w, h)
         return
     end
 
+    -- Pipework goes on first so the tiles drawn over it hide the line ends.
+    self.placements = placements
+    self.linkLayer = LinkLayer.new({
+        segments = baseLinks.build(placements, function(zone) return self:snapshotFor(zone) end),
+    })
+    self.linkLayer:setBounds(x, y, w, h)
+    self:add(self.linkLayer)
+
     for _, placement in ipairs(placements) do
         local zone = placement.zone
         local tile = ZoneTile.new({
@@ -90,6 +100,13 @@ end
 function Dashboard:update()
     for _, tile in ipairs(self.tiles) do
         if tile.zone.module then tile:setSnapshot(self:snapshotFor(tile.zone)) end
+    end
+
+    -- Line colours track module state, so they are rebuilt with the tiles
+    -- rather than only on relayout.
+    if self.linkLayer and self.placements then
+        self.linkLayer:setSegments(baseLinks.build(self.placements,
+            function(zone) return self:snapshotFor(zone) end))
     end
 end
 

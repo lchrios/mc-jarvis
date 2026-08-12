@@ -1,22 +1,33 @@
---- Base map: which zones appear on the dashboard and where.
+--- Mapa de la base: qué zonas aparecen, dónde, y qué conecta con qué.
 --
--- mode = "grid" (default)
---   Zones are placed on a virtual grid and scale to any monitor size. Use
---   col/row (1-indexed) and colSpan/rowSpan.
+-- mode = "grid" (por defecto)
+--   Las zonas se colocan sobre una rejilla virtual y escalan a cualquier
+--   monitor. Usa col/row (empezando en 1) y colSpan/rowSpan.
 --
 -- mode = "absolute"
---   Zones use raw character coordinates (x/y/width/height) inside the content
---   area. Use it for a pixel exact plan on a monitor you never resize.
+--   Coordenadas de carácter (x/y/width/height) dentro del área de contenido.
 --
--- Zone fields:
---   id        unique id
---   label     text shown on the tile
---   module    module id the tile is bound to (its live status is displayed)
---   screen    open this screen instead of the module detail view
---   icon      one or two characters drawn before the label
---   color     background colour name from ui/theme.lua
+-- Campos de una zona:
+--   id        identificador único
+--   label     texto del tile
+--   module    id del módulo al que se enlaza (muestra su estado en vivo)
+--   screen    abre esta pantalla en vez de la vista de detalle del módulo
+--   icon      uno o dos caracteres delante del texto
+--   color     nombre de color de ui/theme.lua para el fondo
+--   links     conexiones que salen de esta zona (ver abajo)
 --
--- Editing this file is enough to rearrange the base: no code changes.
+-- CONEXIONES
+--   links = { "almacen" }                              línea simple
+--   links = { { to = "almacen", kind = "energy" } }    con etiqueta de tipo
+--   links = { { to = "almacen", metric = "flow" } }    el estado sale de esa métrica
+--
+-- El trazado se calcula solo: mueves una zona y la tubería la sigue. El color
+-- indica el estado del flujo:
+--   verde  el origen está funcionando
+--   gris   el origen está parado o en reposo
+--   rojo   alguno de los dos extremos está caído o no disponible
+--
+-- Declarar el enlace en un solo lado basta; hacerlo en los dos no lo duplica.
 
 return {
     mode = "grid",
@@ -39,18 +50,27 @@ return {
             label = "CENTRAL HUB",
             module = "system",
             col = 5, row = 1, colSpan = 4, rowSpan = 3,
+            links = {
+                { to = "storage", kind = "items" },
+            },
         },
         {
             id = "power",
             label = "POWER",
             module = "power",
             col = 9, row = 1, colSpan = 4, rowSpan = 3,
+            links = {
+                { to = "hub", kind = "energy" },
+            },
         },
         {
             id = "farm_demo",
             label = "DEMO FARM",
             module = "demo_farm",
             col = 1, row = 4, colSpan = 4, rowSpan = 3,
+            links = {
+                { to = "storage", kind = "items" },
+            },
         },
         {
             id = "modules",

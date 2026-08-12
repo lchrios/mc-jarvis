@@ -22,6 +22,7 @@ node run.js scenarios/master.lua         # a master ingesting node telemetry
 node run.js scenarios/setup.lua          # the setup wizard and factory reset
 MONITOR_W=57 MONITOR_H=24 node run.js scenarios/detail_scroll.lua  # metric paging
 node run.js scenarios/display.lua        # a display node pinned to one view
+node run.js scenarios/map.lua            # base map: routed links reacting to state
 node run.js scenarios/resilience.lua     # no monitor + forced alert
 node run.js scenarios/modal.lua          # confirm dialog + log viewer
 node run.js scenarios/installer.lua      # install from a fake GitHub, then boot
