@@ -65,9 +65,10 @@ src/
     component.lua        Clase base de componente
     theme.lua            Paleta semántica
     base_layout.lua      Zonas de configuración -> rectángulos
-    components/          label, button, panel, progress_bar, list, modal, zone_tile
+    components/          label, button, panel, progress_bar, list, modal,
+                         pager, zone_tile
     screens/             dashboard, module_detail, module_list, alerts,
-                         peripherals, logs
+                         peripherals, logs, nodes, power_detail
   network/
     protocol.lua         Formato de mensaje (sobre + tipos)
     network.lua          Transporte rednet
@@ -309,6 +310,7 @@ en `monitor_resize` / `term_resize`. Adaptaciones automáticas:
 | Tile más alto que su contenido | El contenido se centra verticalmente |
 | Tile de menos de 4 filas | Se omite la línea de estado |
 | Lista más larga que su alto | Aparece un paginador `^ UP / n-m / DOWN v` con botones de 3 filas |
+| Métricas que no caben en el detalle | Se paginan con el mismo control; ninguna se pierde |
 | Menor que `system.ui.minWidth/minHeight` (45x18) | Se muestra "MONITOR TOO SMALL" con el tamaño real y el necesario |
 
 Tamaño recomendado: monitor de **3x2 bloques o mayor** (~57x24 caracteres).

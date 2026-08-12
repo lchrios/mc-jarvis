@@ -139,6 +139,24 @@ __TEST.injectAt(70, function()
     check(actions[1] and actions[1].enabled == false, "its actions are disabled while offline")
 end)
 
+---------------------------------------------------------- the nodes screen
+__TEST.injectAt(74, function()
+    -- The footer counts nodes; touching that segment opens the list.
+    local navigation = BASEOS.loaded["ui.navigation"]
+    navigation.push("nodes", {})
+end)
+
+__TEST.injectAt(78, function()
+    local screen = __TEST.ui.screen()
+    check(__TEST.ui.screenName() == "nodes", "the nodes screen opens")
+
+    local list
+    for _, child in ipairs(screen and screen.children or {}) do
+        if child.items then list = child end
+    end
+    check(list ~= nil and #list.items == 2, "both nodes are listed")
+end)
+
 ---------------------------------------------------------------- run
 local source = assert(__TEST.files["startup.lua"], "startup.lua not found")
 local chunk = assert(load(source, "@startup.lua", "t", _G))

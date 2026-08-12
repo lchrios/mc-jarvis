@@ -13,6 +13,7 @@ local Label = require("ui.components.label")
 local Button = require("ui.components.button")
 local ProgressBar = require("ui.components.progress_bar")
 local Modal = require("ui.components.modal")
+local Pager = require("ui.components.pager")
 local registry = require("modules.registry")
 local theme = require("ui.theme")
 
@@ -25,6 +26,36 @@ function ModuleDetail:init(params)
     self.title = record and record.name or tostring(self.moduleId)
     self.metricRows = {}
     self.gauges = {}
+    -- Which page of metrics is showing. Survives the relayouts that follow a
+    -- status change, so paging down does not snap back on the next poll.
+    self.pageIndex = 1
+end
+
+--- Split entries into pages that each fit `available` rows.
+-- Entries have different heights (a gauge is two rows), so pages are built by
+-- filling until the next entry would not fit rather than by a fixed count.
+local function paginate(entries, available)
+    local pages = {}
+    local index = 1
+
+    while index <= #entries do
+        local page = { first = index, last = index - 1 }
+        local used = 0
+        while index <= #entries and used + entries[index].height <= available do
+            used = used + entries[index].height
+            page.last = index
+            index = index + 1
+        end
+        -- An entry taller than the whole area would loop forever; show it alone.
+        if page.last < page.first then
+            page.last = page.first
+            index = index + 1
+        end
+        pages[#pages + 1] = page
+    end
+
+    if #pages == 0 then pages[1] = { first = 1, last = 0 } end
+    return pages
 end
 
 function ModuleDetail:onMount()
@@ -71,6 +102,12 @@ function ModuleDetail:runAction(action)
             onClose = function() self:closeModal() end,
         }))
     end
+    self:requestLayout()
+end
+
+--- Move to another page of metrics.
+function ModuleDetail:showPage(index)
+    self.pageIndex = math.max(1, index)
     self:requestLayout()
 end
 
@@ -129,10 +166,36 @@ function ModuleDetail:onLayout(x, y, w, h)
     end
 
     local lastRow = cy + (bodyHeight - 2) - 1
-    for _, metric in ipairs(snapshot.metrics or {}) do
-        if row > lastRow then break end
 
-        if isGauge(metric) and cw >= 12 then
+    -- Metrics are laid out as pageable entries: a module with more of them than
+    -- the monitor can show must be scrollable, not silently truncated.
+    local entries = {}
+    for _, metric in ipairs(snapshot.metrics or {}) do
+        local gauge = isGauge(metric) and cw >= 12
+        entries[#entries + 1] = {
+            metric = metric,
+            gauge = gauge,
+            height = gauge and 3 or 1,
+        }
+    end
+
+    local available = lastRow - row + 1
+    local totalHeight = 0
+    for _, entry in ipairs(entries) do totalHeight = totalHeight + entry.height end
+
+    -- Give up rows for the pager only when there is something to page through.
+    local needsPager = totalHeight > available and available > Pager.HEIGHT + 1
+    if needsPager then available = available - Pager.HEIGHT end
+
+    local pages = paginate(entries, available)
+    self.pageIndex = util.clamp(self.pageIndex, 1, #pages)
+    local page = pages[self.pageIndex]
+
+    for index = page.first, page.last do
+        local entry = entries[index]
+        local metric = entry.metric
+
+        if entry.gauge then
             local bar = ProgressBar.new({
                 label = metric.label,
                 value = gaugeFraction(metric),
@@ -141,7 +204,6 @@ function ModuleDetail:onLayout(x, y, w, h)
             bar:setBounds(cx, row, cw, 2)
             self:add(bar)
             self.gauges[#self.gauges + 1] = { component = bar, metric = metric }
-            row = row + 3
         else
             local label = Label.new({ text = metric.label, fg = "textDim" })
             label:setBounds(cx, row, math.floor(cw / 2), 1)
@@ -155,11 +217,25 @@ function ModuleDetail:onLayout(x, y, w, h)
             self:add(value)
 
             self.metricRows[#self.metricRows + 1] = { component = value, metric = metric }
-            row = row + 1
         end
+        row = row + entry.height
     end
 
-    if #snapshot.metrics == 0 and row <= lastRow then
+    if needsPager and #pages > 1 then
+        local pager = Pager.new({
+            onUp = function() self:showPage(self.pageIndex - 1) end,
+            onDown = function() self:showPage(self.pageIndex + 1) end,
+        })
+        pager:setBounds(cx, lastRow - Pager.HEIGHT + 1, cw, Pager.HEIGHT)
+        pager:setRange(page.first, page.last, #entries,
+            self.pageIndex > 1, self.pageIndex < #pages)
+        self:add(pager)
+        self.pageCount = #pages
+    else
+        self.pageCount = 1
+    end
+
+    if #entries == 0 then
         local empty = Label.new({ text = "This module publishes no metrics.", fg = "textDim" })
         empty:setBounds(cx, row, cw, 1)
         self:add(empty)

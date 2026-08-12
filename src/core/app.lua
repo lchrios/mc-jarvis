@@ -98,6 +98,9 @@ local function registerScreens()
     navigation.register("logs", function(params)
         return require("ui.screens.logs").new(params)
     end)
+    navigation.register("nodes", function(params)
+        return require("ui.screens.nodes").new(params)
+    end)
 end
 
 --- Footer segments: overall status, power (when the module exists) and alerts.
@@ -324,7 +327,17 @@ function app.boot(options)
 
     -- 10. UI wiring + first paint
     if uiActive then
-    bus.on("ui.footer_touch", function() navigation.push("alerts", {}) end, { owner = "app" })
+    -- The footer is a set of shortcuts: touching a segment opens what it counts.
+    bus.on("ui.footer_touch", function(payload)
+        local label = payload and payload.label
+        if label == "Nodes" then
+            navigation.push("nodes", {})
+        elseif label == "Modules" then
+            navigation.push("module_list", {})
+        else
+            navigation.push("alerts", {})
+        end
+    end, { owner = "app" })
     bus.on("ui.header_touch", function()
         if navigation.depth() == 1 then navigation.push("module_list", {}) end
     end, { owner = "app" })

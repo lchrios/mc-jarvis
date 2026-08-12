@@ -7,14 +7,14 @@
 local class = require("core.class")
 local util = require("core.util")
 local Component = require("ui.component")
-local Button = require("ui.components.button")
+local Pager = require("ui.components.pager")
 local theme = require("ui.theme")
 local log = require("core.logger").scoped("ui")
 
 local List = class(Component)
 
 --- Rows reserved at the bottom for the pager buttons.
-local PAGER_HEIGHT = 3
+local PAGER_HEIGHT = Pager.HEIGHT
 
 --- @param options table { items, renderItem, onSelect, emptyText, bg,
 ---                        showScrollbar, pager }
@@ -32,18 +32,13 @@ function List:init(options)
     -- Monitors have no scroll wheel, so an overflowing list gets real buttons
     -- rather than a one-character scrollbar nobody can hit.
     self.pager = options.pager ~= false
-    self.upButton = Button.new({
-        label = theme.chars.arrowUp .. " UP",
-        bracket = false,
-        onPress = function() self:scroll(-self:visibleRows()) end,
+    self.pagerControl = Pager.new({
+        bg = self.bg,
+        onUp = function() self:scroll(-self:visibleRows()) end,
+        onDown = function() self:scroll(self:visibleRows()) end,
     })
-    self.downButton = Button.new({
-        label = "DOWN " .. theme.chars.arrowDown,
-        bracket = false,
-        onPress = function() self:scroll(self:visibleRows()) end,
-    })
-    -- Exposed as children so the usual component traversal finds them.
-    self.children = { self.upButton, self.downButton }
+    -- Exposed as children so the usual component traversal finds the buttons.
+    self.children = { self.pagerControl }
 end
 
 --- True when the list is tall enough to give up rows for the pager and long
@@ -60,15 +55,24 @@ function List:maxOffset()
     return math.max(0, #self.items - self:visibleRows())
 end
 
---- Up / position / down areas, derived without needing the renderer so touch
---- and draw always agree.
-function List:pagerSlots()
-    local third = math.floor(self.w / 3)
-    return {
-        { x = self.x, w = third },
-        { x = self.x + third, w = self.w - 2 * third },
-        { x = self.x + self.w - third, w = third },
-    }
+--- Position and configure the pager. Called before drawing and before handling
+--- a touch, so the two never disagree about where it is.
+-- @return boolean whether the pager is active
+function List:syncPager()
+    local active = self:usesPager()
+    self.pagerControl:setVisible(active)
+    if not active then return false end
+
+    local rows = self:visibleRows()
+    self.pagerControl.screen = self.screen
+    self.pagerControl:setBounds(self.x, self.y + self.h - PAGER_HEIGHT, self.w, PAGER_HEIGHT)
+    self.pagerControl:setRange(
+        self.offset + 1,
+        math.min(self.offset + rows, #self.items),
+        #self.items,
+        self.offset > 0,
+        self.offset < self:maxOffset())
+    return true
 end
 
 function List:setItems(items)
@@ -93,43 +97,6 @@ end
 local function normaliseRow(rendered)
     if type(rendered) == "table" then return rendered end
     return { text = tostring(rendered) }
-end
-
---- Position and enable the pager buttons. Called before drawing and before
---- handling a touch so the two never disagree about where they are.
--- @return boolean whether the pager is active
-function List:syncPager()
-    local active = self:usesPager()
-    self.upButton:setVisible(active)
-    self.downButton:setVisible(active)
-    if not active then return false end
-
-    local slots = self:pagerSlots()
-    local top = self.y + self.h - PAGER_HEIGHT
-
-    self.upButton.screen = self.screen
-    self.downButton.screen = self.screen
-    self.upButton:setBounds(slots[1].x, top, slots[1].w, PAGER_HEIGHT)
-    self.downButton:setBounds(slots[3].x, top, slots[3].w, PAGER_HEIGHT)
-    self.upButton:setEnabled(self.offset > 0)
-    self.downButton:setEnabled(self.offset < self:maxOffset())
-    return true
-end
-
---- Big touch targets: [ ^ UP ]  9-16 / 23  [ DOWN v ]
-function List:drawPager(renderer)
-    local slots = self:pagerSlots()
-    local top = self.y + self.h - PAGER_HEIGHT
-    local rows = self:visibleRows()
-
-    self.upButton:draw(renderer)
-    self.downButton:draw(renderer)
-
-    local first = self.offset + 1
-    local last = math.min(self.offset + rows, #self.items)
-    renderer:fill(slots[2].x, top, slots[2].w, PAGER_HEIGHT, self.bg, " ")
-    renderer:writeCentered(slots[2].x, top + 1, slots[2].w,
-        ("%d-%d / %d"):format(first, last, #self.items), "textDim", self.bg)
 end
 
 function List:draw(renderer)
@@ -177,14 +144,11 @@ function List:draw(renderer)
         renderer:fill(barX, self.y + position, 1, span, "accent", " ")
     end
 
-    if usePager then self:drawPager(renderer) end
+    if usePager then self.pagerControl:draw(renderer) end
 end
 
 function List:onTouch(px, py)
-    if self:syncPager() and py >= self.y + self.h - PAGER_HEIGHT then
-        -- The buttons own the outer thirds; the middle is just a readout.
-        if self.upButton:handleTouch(px, py) then return true end
-        if self.downButton:handleTouch(px, py) then return true end
+    if self:syncPager() and self.pagerControl:handleTouch(px, py) then
         return true
     end
 

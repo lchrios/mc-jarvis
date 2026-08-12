@@ -37,6 +37,7 @@ local options = {
 local statusProvider = nil
 local dirty = true
 local backHotspot = nil
+local footerHotspots = {}
 
 ---------------------------------------------------------------------------
 -- Setup
@@ -252,6 +253,9 @@ local function drawFooter()
         if ok and type(result) == "table" then segments = result end
     end
 
+    -- Remember where each segment landed so a touch can name the one it hit.
+    footerHotspots = {}
+
     local cursor = 2
     for _, segment in ipairs(segments) do
         local label = segment.label and (segment.label .. ": ") or ""
@@ -260,6 +264,9 @@ local function drawFooter()
         renderer:write(cursor, height, label, "footerText", "footerBg")
         renderer:write(cursor + #label, height, tostring(segment.value),
             segment.color or "footerText", "footerBg")
+        footerHotspots[#footerHotspots + 1] = {
+            label = segment.label, x1 = cursor, x2 = cursor + #text - 1,
+        }
         cursor = cursor + #text + 2
     end
 end
@@ -349,7 +356,11 @@ function navigation.handleTouch(px, py)
 
     local height = renderer:height()
     if options.showFooter and py == height then
-        bus.emit("ui.footer_touch", { x = px })
+        local hit = nil
+        for _, hotspot in ipairs(footerHotspots) do
+            if px >= hotspot.x1 and px <= hotspot.x2 then hit = hotspot.label break end
+        end
+        bus.emit("ui.footer_touch", { x = px, label = hit })
         return true
     end
 
