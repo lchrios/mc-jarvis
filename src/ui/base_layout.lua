@@ -13,6 +13,15 @@ local util = require("core.util")
 
 local baseLayout = {}
 
+--- Space between tiles. `"auto"` (the default) widens the gap on big monitors,
+--- where a single character of separation reads as "stuck together".
+local function resolveGap(configured, area)
+    if type(configured) == "number" then return configured end
+    local smallest = math.min(area.w, area.h)
+    if smallest >= 34 then return 2 end
+    return 1
+end
+
 local function gridSpan(origin, total, index, span, count)
     local start = origin + math.floor((index - 1) * total / count)
     local finish = origin + math.floor((index - 1 + span) * total / count) - 1
@@ -77,6 +86,8 @@ function baseLayout.resolve(layoutConfig, area, fallbackModuleIds)
         end
     end
 
+    local gap = resolveGap(layoutConfig.gap, area)
+
     local placed = {}
     for index, rawZone in ipairs(zones) do
         local zone = normaliseZone(rawZone, index)
@@ -100,7 +111,6 @@ function baseLayout.resolve(layoutConfig, area, fallbackModuleIds)
             rect = { x = zx, y = zy, w = zw, h = zh }
 
             -- Breathing room between tiles, but never at the cost of legibility.
-            local gap = layoutConfig.gap or 1
             if gap > 0 and zw - gap >= 4 then rect.w = zw - gap end
             if gap > 0 and zh - gap >= 3 then rect.h = zh - gap end
         end

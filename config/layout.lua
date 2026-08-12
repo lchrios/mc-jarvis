@@ -20,7 +20,11 @@
 
 return {
     mode = "grid",
-    gap = 1,
+
+    -- Separación entre tiles. "auto" usa 1 en monitores pequeños y 2 en los
+    -- grandes; pon un número para fijarla.
+    gap = "auto",
+
     grid = { columns = 12, rows = 6 },
 
     zones = {

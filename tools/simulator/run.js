@@ -54,7 +54,9 @@ function luaString(value) {
     Object.entries(files)
       .map(([name, contents]) => `  [${luaString(name)}] = ${luaString(contents)},`)
       .join('\n') +
-    `\n}\n__MAX_EVENTS = ${process.env.MAX_EVENTS || 400}\n`;
+    `\n}\n__MAX_EVENTS = ${process.env.MAX_EVENTS || 400}\n` +
+    `__MONITOR_W = ${process.env.MONITOR_W || 82}\n` +
+    `__MONITOR_H = ${process.env.MONITOR_H || 25}\n`;
 
   try {
     await lua.doString(fileMap);

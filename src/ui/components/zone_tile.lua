@@ -41,34 +41,44 @@ function ZoneTile:draw(renderer)
         fill = bg,
     })
 
-    local innerX, innerY = self.x + 1, self.y + 1
+    local innerX = self.x + 1
     local innerW = self.w - 2
-    if innerW <= 0 then return end
+    local innerH = self.h - 2
+    if innerW <= 0 or innerH <= 0 then return end
+
+    -- Build the rows first, then centre the block vertically: on a big monitor
+    -- a tile is much taller than its contents and top-aligned text looks lost.
+    local rows = {}
 
     local title = self.zone.label or snapshot.label or self.zone.id or "?"
     if self.zone.icon then title = self.zone.icon .. " " .. title end
-    renderer:writeCentered(innerX, innerY, innerW, util.truncate(title, innerW), "text", bg)
-
-    local row = innerY + 1
-    local lastRow = self.y + self.h - 2
+    rows[#rows + 1] = { text = title, fg = "text" }
 
     if self.h >= 4 then
         local statusText = snapshot.statusText or tostring(snapshot.status or "unknown"):upper()
         if not available then statusText = "N/A" end
         -- An empty status is a deliberate choice (shortcut tiles), not a gap.
         if statusText ~= "" then
-            renderer:writeCentered(innerX, row, innerW, util.truncate(statusText, innerW), statusColor, bg)
+            rows[#rows + 1] = { text = statusText, fg = statusColor }
         end
-        row = row + 1
     end
 
     for _, line in ipairs(snapshot.lines or {}) do
+        rows[#rows + 1] = { text = line, fg = "textDim" }
+    end
+
+    local showGauge = snapshot.gauge ~= nil and innerW >= 4
+    local needed = #rows + (showGauge and 1 or 0)
+    local row = self.y + 1 + math.max(0, math.floor((innerH - needed) / 2))
+    local lastRow = self.y + self.h - 2
+
+    for _, entry in ipairs(rows) do
         if row > lastRow then break end
-        renderer:writeCentered(innerX, row, innerW, util.truncate(line, innerW), "textDim", bg)
+        renderer:writeCentered(innerX, row, innerW, util.truncate(entry.text, innerW), entry.fg, bg)
         row = row + 1
     end
 
-    if snapshot.gauge ~= nil and row <= lastRow and innerW >= 4 then
+    if showGauge and row <= lastRow then
         renderer:progress(innerX, row, innerW, snapshot.gauge, {
             fill = statusColor,
             track = "gaugeTrack",

@@ -24,6 +24,12 @@ local options = {
     showHeader = true,
     showFooter = true,
     useInGameClock = true,
+    -- Breathing room between the chrome and whatever a screen draws.
+    paddingX = 1,
+    paddingY = 1,
+    -- Below this the UI is not worth drawing; say so instead of rendering mush.
+    minWidth = 26,
+    minHeight = 10,
 }
 local statusProvider = nil
 local dirty = true
@@ -75,11 +81,22 @@ function navigation.currentName()
     return entry and entry.name or nil
 end
 
+--- The rectangle a screen may draw in: between header and footer, inset by the
+--- configured padding. On cramped displays the padding is dropped, because a
+--- row of margin is worth less than a row of content.
 local function contentRect()
     local width, height = renderer:size()
     local top = options.showHeader and 2 or 1
     local bottom = options.showFooter and (height - 1) or height
-    return 1, top, width, math.max(1, bottom - top + 1)
+
+    local padX = width >= 40 and (options.paddingX or 0) or 0
+    local padY = (bottom - top + 1) >= 14 and (options.paddingY or 0) or 0
+
+    local x = 1 + padX
+    local y = top + padY
+    return x, y,
+        math.max(1, width - padX * 2),
+        math.max(1, (bottom - padY) - y + 1)
 end
 
 local function mountScreen(entry)
@@ -244,10 +261,31 @@ local function drawFooter()
     end
 end
 
+--- Tell the user the display is unusable instead of drawing a broken layout.
+local function drawTooSmall()
+    local width, height = renderer:size()
+    renderer:beginFrame()
+    renderer:clear("background")
+    local row = math.max(1, math.floor(height / 2) - 1)
+    renderer:writeCentered(1, row, width, "MONITOR TOO SMALL", "statusError", "background")
+    renderer:writeCentered(1, row + 1, width,
+        ("have %dx%d"):format(width, height), "textDim", "background")
+    renderer:writeCentered(1, row + 2, width,
+        ("need %dx%d"):format(options.minWidth, options.minHeight), "textDim", "background")
+    renderer:endFrame()
+end
+
 --- Draw one frame. Returns false when nothing needed repainting.
 function navigation.draw(force)
     if not renderer then return false end
     if not dirty and not force then return false end
+
+    local width, height = renderer:size()
+    if width < options.minWidth or height < options.minHeight then
+        dirty = false
+        drawTooSmall()
+        return true
+    end
 
     local entry = stack[#stack]
     dirty = false

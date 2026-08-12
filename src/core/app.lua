@@ -234,6 +234,10 @@ function app.boot(options)
         showHeader = config.get("system.ui.showHeader", true),
         showFooter = config.get("system.ui.showFooter", true),
         useInGameClock = config.get("system.useInGameClock", true),
+        paddingX = config.get("system.ui.paddingX", 1),
+        paddingY = config.get("system.ui.paddingY", 1),
+        minWidth = config.get("system.ui.minWidth", 26),
+        minHeight = config.get("system.ui.minHeight", 10),
     })
     registerScreens()
     navigation.setStatusProvider(statusProvider)

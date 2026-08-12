@@ -225,7 +225,8 @@ function window.create(parent, x, y, w, h, visible)
 end
 
 ---------------------------------------------------------------- peripherals
-local monitor = makeTerm(82, 25, "monitor_0")
+-- Monitor size is overridable so scenarios can check how the UI scales.
+local monitor = makeTerm(tonumber(__MONITOR_W) or 82, tonumber(__MONITOR_H) or 25, "monitor_0")
 local peripherals = {
     monitor_0 = { types = { "monitor" }, object = monitor },
 }
@@ -318,7 +319,8 @@ local function snapshot(label)
     }
 end
 
-local injections = {}   -- [eventIndex] = event, injected instead of the queue
+local injections = {}     -- [eventIndex] = event or producer, instead of the queue
+local harnessErrors = {}  -- failures inside scenario hooks
 
 function os.pullEventRaw()
     processed = processed + 1
@@ -330,6 +332,18 @@ function os.pullEventRaw()
     end
 
     local injected = injections[processed]
+    if type(injected) == "function" then
+        -- Evaluated at delivery time, so a scenario can look at the live UI
+        -- instead of hardcoding coordinates that rot on every layout change.
+        -- Failures are recorded rather than raised: BaseOS catches everything
+        -- that escapes the event loop, which would hide them.
+        local produced
+        local okProducer, err = pcall(function() produced = injected() end)
+        if not okProducer then
+            harnessErrors[#harnessErrors + 1] = tostring(err)
+        end
+        injected = produced
+    end
     if injected then
         lastEvent = injected[1]
         return table.unpack(injected)
@@ -568,8 +582,80 @@ __TEST = {
         queue[#queue + 1] = { "peripheral_detach", name }
     end,
     queueEventAt = function(index, ...) injections[index] = { ... } end,
+    --- Deliver whatever `producer()` returns as the Nth event (or nothing).
+    injectAt = function(index, producer) injections[index] = producer end,
+    --- Errors raised inside scenario hooks, which BaseOS would otherwise hide.
+    errors = function() return harnessErrors end,
+    --- True when startup.lua printed its crash banner on the terminal.
+    crashed = function()
+        return nativeTerm.render():find("stopped with an error", 1, true) ~= nil
+    end,
     --- What the fake GitHub serves (defaults to the project on disk).
     remote = function() return remote end,
+    --- Drive the UI by what it shows rather than by coordinates.
+    ui = {
+        --- The screen currently on top of the navigation stack.
+        screen = function()
+            local nav = BASEOS and BASEOS.loaded["ui.navigation"]
+            local entry = nav and nav.current()
+            return entry and entry.screen or nil
+        end,
+
+        --- Name of the current screen, e.g. "dashboard".
+        screenName = function()
+            local nav = BASEOS and BASEOS.loaded["ui.navigation"]
+            return nav and nav.currentName() or nil
+        end,
+
+        --- Centre of the first component whose label matches `text`.
+        -- Searches the modal first (it is exclusive while open), then the
+        -- screen tree, so buttons and zone tiles are both reachable.
+        locate = function(text)
+            local screen = __TEST.ui.screen()
+            if not screen then return nil end
+
+            local function labelOf(component)
+                if component.label then return component.label end
+                if component.zone and component.zone.label then return component.zone.label end
+                return nil
+            end
+
+            local function search(components)
+                for _, component in ipairs(components or {}) do
+                    if labelOf(component) == text and component.visible ~= false then
+                        return component.x + math.floor(component.w / 2),
+                               component.y + math.floor((component.h - 1) / 2)
+                    end
+                    if component.children then
+                        local x, y = search(component.children)
+                        if x then return x, y end
+                    end
+                end
+                return nil
+            end
+
+            if screen.modal then
+                local x, y = search(screen.modal.buttons)
+                if x then return x, y end
+            end
+            return search(screen.children)
+        end,
+
+        --- A touch event on the component labelled `text`. Errors when absent,
+        --- so a scenario fails loudly instead of silently touching nothing.
+        touch = function(text)
+            local x, y = __TEST.ui.locate(text)
+            if not x then
+                error(("no component labelled '%s' on screen '%s'")
+                    :format(text, tostring(__TEST.ui.screenName())), 0)
+            end
+            return { "monitor_touch", "monitor_0", x, y }
+        end,
+
+        --- A touch on the header's back button.
+        back = function() return { "monitor_touch", "monitor_0", 3, 1 } end,
+    },
+
     --- Empty the computer's filesystem, keeping the listed paths.
     wipeDisk = function(keep)
         local kept = {}

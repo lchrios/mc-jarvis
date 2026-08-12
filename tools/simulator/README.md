@@ -17,12 +17,16 @@ node run.js                              # dashboard walkthrough on an 82x25 mon
 node run.js scenarios/resilience.lua     # no monitor + forced alert
 node run.js scenarios/modal.lua          # confirm dialog + log viewer
 node run.js scenarios/installer.lua      # install from a fake GitHub, then boot
+node run.js scenarios/render.lua         # print one frame, for eyeballing layout
 MAX_EVENTS=200 node run.js               # let the scheduler run longer
 SNAPSHOT=3 node run.js                   # print only the third snapshot
+MONITOR_W=57 MONITOR_H=24 node run.js scenarios/render.lua   # 3x2 monitor
 ```
 
 Every scenario fails (non-zero exit) if the log contains an `[ERROR]` line, so
-they double as a regression check.
+they double as a regression check. `dashboard.lua` additionally asserts the
+result of each interaction, and locates buttons **by label**: a layout change
+moves the touch instead of silently missing it.
 
 ## What the mock covers
 
@@ -45,6 +49,12 @@ Drop a `.lua` file into `scenarios/`. Useful helpers exposed by the mock:
 
 | Helper | Purpose |
 | --- | --- |
+| `__TEST.ui.touch("STOP")` | a touch on the component with that label |
+| `__TEST.ui.back()` | a touch on the header back button |
+| `__TEST.ui.screenName()` | which screen is on top of the stack |
+| `__TEST.injectAt(eventIndex, producer)` | deliver `producer()`'s event as the Nth event |
+| `__TEST.errors()` | failures inside scenario hooks (BaseOS would hide them) |
+| `__TEST.crashed()` | true if startup.lua printed its crash banner |
 | `__TEST.touchAt(eventIndex, x, y)` | deliver a `monitor_touch` as the Nth event |
 | `__TEST.queueEventAt(eventIndex, name, ...)` | deliver an arbitrary event |
 | `__TEST.detach(name)` | remove a peripheral and fire `peripheral_detach` |

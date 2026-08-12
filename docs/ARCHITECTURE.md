@@ -272,10 +272,22 @@ publican datos (`status`, `metrics`, `tile`, `actions`); las pantallas los pinta
   `update` solo refresca valores.
 * **Navigation** — registro de pantallas por nombre, pila de navegación y cromo
   persistente: cabecera con `< BACK`, título y reloj; pie con estado, alertas y
-  número de módulos. Las pantallas solo reciben el rectángulo intermedio.
+  número de módulos. Las pantallas solo reciben el rectángulo intermedio, ya
+  descontado el margen (`system.ui.paddingX/paddingY`).
 
 Nada asume una resolución fija. El tamaño se lee del dispositivo y se recalcula
-en `monitor_resize` / `term_resize`.
+en `monitor_resize` / `term_resize`. Adaptaciones automáticas:
+
+| Situación | Comportamiento |
+| --- | --- |
+| Ancho < 40 o alto útil < 14 | Se elimina el margen: cada fila cuenta más |
+| Área pequeña (lado menor < 34) | Separación entre tiles de 1 carácter |
+| Área grande | Separación de 2 (`layout.gap = "auto"`) |
+| Tile más alto que su contenido | El contenido se centra verticalmente |
+| Tile de menos de 4 filas | Se omite la línea de estado |
+| Menor que `system.ui.minWidth/minHeight` (26x10) | Se muestra "MONITOR TOO SMALL" |
+
+Tamaño recomendado: monitor de **3x2 bloques o mayor** (~57x24 caracteres).
 
 ### Mapa de la base
 

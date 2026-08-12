@@ -42,6 +42,10 @@ local DEFAULTS = {
             useTerminalFallback = true,
             showFooter = true,
             showHeader = true,
+            paddingX = 1,            -- margin between the chrome and the content
+            paddingY = 1,
+            minWidth = 26,           -- below this the UI refuses to draw
+            minHeight = 10,
         },
         modules = {
             defaultPollInterval = 2.0,

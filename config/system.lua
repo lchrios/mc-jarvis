@@ -25,6 +25,16 @@ return {
         useTerminalFallback = true,
         showHeader = true,
         showFooter = true,
+
+        -- Margen entre la cabecera/pie y el contenido. Se ignora solo en
+        -- pantallas muy pequeñas, donde cada fila cuenta.
+        paddingX = 1,
+        paddingY = 1,
+
+        -- Por debajo de esto la UI muestra "MONITOR TOO SMALL" en lugar de
+        -- dibujar algo ilegible. Tamaño recomendado: monitor de 3x2 o mayor.
+        minWidth = 26,
+        minHeight = 10,
     },
 
     modules = {
