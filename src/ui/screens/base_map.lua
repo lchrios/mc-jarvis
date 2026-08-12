@@ -10,10 +10,11 @@ local Screen = require("ui.screen")
 local ZoneTile = require("ui.components.zone_tile")
 local LinkLayer = require("ui.components.link_layer")
 local Label = require("ui.components.label")
+local Button = require("ui.components.button")
 local baseLayout = require("ui.base_layout")
 local baseLinks = require("ui.base_links")
 local registry = require("modules.registry")
-local config = require("core.config")
+local layoutStore = require("services.layout_store")
 
 local BaseMap = class(Screen)
 
@@ -31,6 +32,8 @@ function BaseMap:onMount(context)
     self:onCleanup(bus.on("module.unregistered", relayout, { owner = "screen:map" }))
     self:onCleanup(bus.on("module.availability_changed", function() self:invalidate() end,
         { owner = "screen:map" }))
+    -- The editor writes a new plan; pick it up without a reboot.
+    self:onCleanup(bus.on("layout.changed", relayout, { owner = "screen:map" }))
 end
 
 function BaseMap:openZone(zone)
@@ -62,7 +65,7 @@ end
 function BaseMap:onLayout(x, y, w, h)
     self.tiles = {}
 
-    local layoutConfig = config.section("layout")
+    local layoutConfig = layoutStore.current()
     local moduleIds = {}
     for _, record in ipairs(registry.all()) do moduleIds[#moduleIds + 1] = record.id end
 
@@ -84,6 +87,17 @@ function BaseMap:onLayout(x, y, w, h)
     self.linkLayer:setBounds(x, y, w, h)
     self:add(self.linkLayer)
 
+    -- An EDIT button in the corner: the editor belongs where the plan is.
+    if h >= 6 and w >= 20 then
+        local edit = Button.new({
+            label = "EDIT",
+            bracket = false,
+            onPress = function() self.context.navigation.push("layout_editor", {}) end,
+        })
+        edit:setBounds(x + w - 8, y + h - 1, 8, 1)
+        self.editButton = edit
+    end
+
     for _, placement in ipairs(placements) do
         local zone = placement.zone
         local tile = ZoneTile.new({
@@ -95,6 +109,9 @@ function BaseMap:onLayout(x, y, w, h)
         self:add(tile)
         self.tiles[#self.tiles + 1] = tile
     end
+
+    -- Added last so it sits above any tile that reaches the corner.
+    if self.editButton then self:add(self.editButton) end
 end
 
 function BaseMap:update()

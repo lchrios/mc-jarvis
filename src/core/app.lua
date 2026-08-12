@@ -112,6 +112,9 @@ local function registerScreens()
     navigation.register("map", function(params)
         return require("ui.screens.base_map").new(params)
     end)
+    navigation.register("layout_editor", function(params)
+        return require("ui.screens.layout_editor").new(params)
+    end)
 end
 
 --- Footer segments: overall status, power (when the module exists) and alerts.

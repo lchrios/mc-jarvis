@@ -38,6 +38,48 @@ local settings = {
 -- Node side
 ---------------------------------------------------------------------------
 
+--- Methods worth advertising: enough for the master to know what a node can
+--- read, without shipping the whole method list of every device.
+local CAPABILITY_METHODS = {
+    energy = { "getEnergy", "getEnergyStored", "getStoredEnergy" },
+    throughput = { "getTransferRate" },
+    inventory = { "list" },
+    fluid = { "tanks" },
+    storageNetwork = { "listItems" },
+}
+
+--- What this node can see on its own wired network.
+-- The master keeps this as a live cache: it is how the layout editor knows
+-- which devices exist and which computer owns them, without anybody writing it
+-- down. Note this is *membership*, not topology - CC exposes a block's own
+-- capability, never how the mod's cables join two blocks together.
+local function describePeripherals(ctx)
+    local described = {}
+
+    for _, name in ipairs(ctx.peripherals.names()) do
+        local proxy = ctx.peripherals.getByName(name)
+        if proxy then
+            local capabilities = {}
+            for capability, candidates in pairs(CAPABILITY_METHODS) do
+                for _, method in ipairs(candidates) do
+                    if proxy.hasMethod(method) then
+                        capabilities[#capabilities + 1] = capability
+                        break
+                    end
+                end
+            end
+
+            described[#described + 1] = {
+                name = name,
+                types = proxy.types(),
+                capabilities = capabilities,
+            }
+        end
+    end
+
+    return described
+end
+
 --- Everything this computer knows about itself, in one message.
 local function buildSnapshot(ctx)
     local modules = {}
@@ -68,6 +110,7 @@ local function buildSnapshot(ctx)
         uptime = ctx.app.uptime(),
         alerts = ctx.alerts.list(),
         modules = modules,
+        peripherals = describePeripherals(ctx),
     }
 end
 
@@ -162,6 +205,12 @@ function telemetry.startCollector(ctx, options)
             online = true,
         })
 
+        -- Replaced wholesale rather than merged: a device that was unplugged
+        -- must disappear, and a patch would keep it alive forever.
+        if snapshot.peripherals then
+            state.set("nodes." .. snapshot.node .. ".peripherals", snapshot.peripherals)
+        end
+
         syncRemoteModules(ctx, snapshot)
         bus.emit("node.updated", { node = snapshot.node })
     end)
@@ -214,6 +263,41 @@ function telemetry.sendAction(ctx, node, moduleId, actionId)
         module = moduleId, action = actionId,
     })
     return sent, sent and nil or ("could not reach node '" .. node .. "'")
+end
+
+--- Every device known across the base: local ones plus everything the nodes
+--- have reported. Used by the layout editor and the device tree.
+-- @return list of { name, types, capabilities, node }
+function telemetry.knownPeripherals(ctx)
+    local devices = {}
+
+    for _, name in ipairs(ctx.peripherals.names()) do
+        local proxy = ctx.peripherals.getByName(name)
+        devices[#devices + 1] = {
+            name = name,
+            types = proxy and proxy.types() or {},
+            node = ctx.identity and ctx.identity.name or "local",
+            localDevice = true,
+        }
+    end
+
+    for nodeName, node in pairs(state.get("nodes", {})) do
+        for _, device in ipairs(node.peripherals or {}) do
+            devices[#devices + 1] = {
+                name = device.name,
+                types = device.types or {},
+                capabilities = device.capabilities or {},
+                node = nodeName,
+                online = node.online,
+            }
+        end
+    end
+
+    table.sort(devices, function(a, b)
+        if a.node ~= b.node then return a.node < b.node end
+        return a.name < b.name
+    end)
+    return devices
 end
 
 --- Known nodes, most recently seen first.

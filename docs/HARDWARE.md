@@ -179,8 +179,12 @@ nada dice que está esperando.
 
 ## El plano de la base
 
-Solo en el master, `config/layout.lua`. Colocas las salas y declaras qué conecta
-con qué; el recorrido de las tuberías se calcula solo:
+Lo más cómodo es dibujarlo desde el propio monitor: **MAP** y luego **EDIT**.
+Eliges el módulo en la lista, lo mueves con las flechas y guardas. Eso escribe
+`data/layout.dat` sin tocar tu `config/layout.lua`.
+
+A mano, en el master, `config/layout.lua`. Colocas las salas y declaras qué
+conecta con qué; el recorrido de las tuberías se calcula solo:
 
 ```lua
 zones = {

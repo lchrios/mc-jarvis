@@ -236,6 +236,41 @@ Mueves la zona y la tubería la sigue. El color dice qué pasa: **verde** fluyen
 **gris** parado, **rojo** algún extremo caído. Así un nodo que se cae se ve en el
 plano, no solo en su tile.
 
+### Editor del plano
+
+No hace falta editar ficheros: en el mapa, botón **EDIT**.
+
+```
++-- EDIT LAYOUT ---------------------------------------------+
+| MODULES      + STORAGE ----+  + CENTRAL HUB -+  + POWER --+ |
+| * System     |             |  |              |  |         | |
+| * Power      |             |  |=1            |  |=1       | |
+| * Storage    +-------------+  +--------------+  +---------+ |
+|   Demo Farm                                                 |
++-------------------------------------------------------------+
+| Selected: hub                                               |
+|   MOVE     <     v     ^     >                              |
+|         ADD        DEL       SAVE       EXIT                |
++-------------------------------------------------------------+
+```
+
+A la izquierda, todos los módulos detectados; `*` marca los que ya están en el
+plano. Un modo con cuatro flechas en vez de veinte botones, para que los targets
+sigan siendo grandes en un 3x2:
+
+| Modo | Las flechas hacen |
+| --- | --- |
+| `MOVE` | Desplazan la zona por la rejilla |
+| `SIZE` | La agrandan o encogen |
+| `LINK` | Tocas dos zonas y crea (o quita) la tubería entre ellas |
+
+`ADD` mete en el plano un módulo detectado que aún no esté; `DEL` lo saca y
+limpia las tuberías que apuntaban a él. Nada se escribe hasta pulsar `SAVE`.
+
+Lo que guardas va a **`data/layout.dat`**, no a `config/layout.lua`: tu fichero y
+tus comentarios quedan intactos, y el override manda mientras exista. `reset` lo
+borra y vuelves al de config.
+
 ## Documentación
 
 * [docs/HARDWARE.md](docs/HARDWARE.md) — qué bloques montar y cómo cablearlos,
