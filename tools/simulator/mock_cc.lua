@@ -593,29 +593,57 @@ local function jsonEscape(text)
     end))
 end
 
+-- Not git's SHA-1, just a deterministic content hash. The updater only ever
+-- compares these for equality, and a constant would make "is there an update?"
+-- untestable.
+local function contentHash(text)
+    local a, b = 5381, 52711
+    for index = 1, #text do
+        local byte = text:byte(index)
+        a = (a * 33 + byte) % 4294967296
+        b = (b * 31 + byte * 7) % 4294967296
+    end
+    return ("%08x%08x%08x"):format(a, b, #text % 4294967296)
+end
+
 local function treeResponse()
+    local paths = {}
+    for path in pairs(remote) do paths[#paths + 1] = path end
+    table.sort(paths)
+
     local entries = {}
+    local fingerprint = {}
     local seenDirs = {}
-    for path in pairs(remote) do
+
+    for _, path in ipairs(paths) do
         local dir = path:match("^(.*)/[^/]*$")
         if dir and not seenDirs[dir] then
             seenDirs[dir] = true
             entries[#entries + 1] = ('{"path":"%s","type":"tree"}'):format(jsonEscape(dir))
         end
-        entries[#entries + 1] =
-            ('{"path":"%s","type":"blob","size":%d}'):format(jsonEscape(path), #remote[path])
+        local sha = contentHash(remote[path])
+        entries[#entries + 1] = ('{"path":"%s","type":"blob","sha":"%s","size":%d}')
+            :format(jsonEscape(path), sha, #remote[path])
+        fingerprint[#fingerprint + 1] = path .. ":" .. sha
     end
-    return '{"sha":"deadbeef","truncated":false,"tree":[' .. table.concat(entries, ",") .. "]}"
+
+    -- The root SHA has to change whenever any file changes, like a real tree.
+    return ('{"sha":"%s","truncated":false,"tree":[%s]}')
+        :format(contentHash(table.concat(fingerprint, "\n")), table.concat(entries, ","))
 end
+
+local httpCalls = { tree = 0, raw = 0 }
 
 http = {}
 function http.get(url)
     local body
     if url:find("api.github.com", 1, true) and url:find("/git/trees/", 1, true) then
+        httpCalls.tree = httpCalls.tree + 1
         body = treeResponse()
     else
         local path = url:match("raw%.githubusercontent%.com/[^/]+/[^/]+/[^/]+/(.+)$")
         body = path and remote[path]
+        if body then httpCalls.raw = httpCalls.raw + 1 end
     end
 
     if not body then return nil, "404 Not Found" end
@@ -639,6 +667,13 @@ rednet = {
 }
 
 shell = { getRunningProgram = function() return "startup.lua" end }
+
+---------------------------------------------------------------- console input
+-- `read` and `write` are CC globals, not Lua ones. Scenarios queue the answers
+-- a prompt should receive.
+local inputQueue = {}
+function read() return table.remove(inputQueue, 1) or "" end
+function write(text) io.write(tostring(text)) end
 
 keys = { q = 16, enter = 28 }
 
@@ -675,6 +710,13 @@ __TEST = {
     end,
     --- What the fake GitHub serves (defaults to the project on disk).
     remote = function() return remote end,
+    --- Answers handed to the next `read()` prompts, in order.
+    queueInput = function(...)
+        for _, answer in ipairs({ ... }) do inputQueue[#inputQueue + 1] = answer end
+    end,
+    --- How many requests hit the fake GitHub, to prove nothing was downloaded.
+    httpCalls = function() return { tree = httpCalls.tree, raw = httpCalls.raw } end,
+    resetHttpCalls = function() httpCalls.tree, httpCalls.raw = 0, 0 end,
     --- Drive the UI by what it shows rather than by coordinates.
     ui = {
         --- The screen currently on top of the navigation stack.

@@ -39,10 +39,29 @@ installer
 reboot
 ```
 
-El instalador descarga el proyecto desde GitHub. Para actualizar más adelante
-basta con volver a ejecutar `installer`: tu `config/` y tu `data/` **no** se
-sobrescriben nunca. Si has renombrado o borrado módulos, `installer main clean`
-limpia `src/` antes de instalar.
+## Mantenerlo actualizado
+
+`installer` solo trae el updater y hace la primera instalación. A partir de ahí
+la herramienta es **`updater`**:
+
+```
+updater
+```
+
+Compara el repositorio con lo que tienes instalado y, si hay algo nuevo, enseña
+qué ficheros cambian y **pregunta antes de tocar nada**. Descarga solo lo que
+cambió, no el proyecto entero.
+
+| Comando | Qué hace |
+| --- | --- |
+| `updater` | Comprueba y pregunta antes de aplicar |
+| `updater check` | Solo informa, no cambia nada |
+| `updater -y` | Aplica sin preguntar |
+| `updater force` | Re-descarga todo, aunque no haya cambiado |
+| `updater dev` | Trabaja contra otra rama o etiqueta |
+
+Tu `config/` y tu `data/` **no** se sobrescriben nunca. La versión instalada, la
+rama y el commit se ven en el tile **CENTRAL HUB**.
 
 Alternativa sin HTTP: copiar el repositorio a
 `saves/<mundo>/computercraft/computer/<id>/` con `startup.lua` en la raíz.

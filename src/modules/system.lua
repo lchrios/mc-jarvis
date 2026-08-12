@@ -18,6 +18,8 @@ local startedAt = util.nowMs()
 function system.setup(self, ctx)
     self.ctx = ctx
     self.bootTime = startedAt
+    -- Written by the updater. Read once: it only changes while BaseOS is off.
+    self.install = ctx.persistence.load("install", nil)
 end
 
 function system.poll(self)
@@ -64,6 +66,15 @@ function system.metrics(self)
               return util.formatNumber(value) .. "B"
           end },
         { id = "version", label = "BaseOS", value = (BASEOS and BASEOS.version) or "?" },
+        { id = "channel", label = "Branch",
+          value = self.install and self.install.ref or "-" },
+        { id = "commit", label = "Commit",
+          value = self.install and self.install.sha and self.install.sha:sub(1, 7) or "-" },
+        { id = "updated", label = "Updated", value = self.install and self.install.installedAt,
+          format = function(value)
+              if not value then return "-" end
+              return util.formatDuration((util.nowMs() - value) / 1000) .. " ago"
+          end },
     }
 end
 

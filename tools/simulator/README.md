@@ -18,6 +18,7 @@ node run.js scenarios/farm.lua           # real farm module against a real barre
 node run.js scenarios/resilience.lua     # no monitor + forced alert
 node run.js scenarios/modal.lua          # confirm dialog + log viewer
 node run.js scenarios/installer.lua      # install from a fake GitHub, then boot
+node run.js scenarios/updater.lua        # full update cycle, including the prompt
 node run.js scenarios/render.lua         # print one frame, for eyeballing layout
 MAX_EVENTS=200 node run.js               # let the scheduler run longer
 SNAPSHOT=3 node run.js                   # print only the third snapshot

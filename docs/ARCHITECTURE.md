@@ -13,6 +13,9 @@ núcleo pequeño de servicios sobre el que se enchufan módulos.
 
 ```
 startup.lua              Bootstrap: cargador de módulos + arranque de core.app
+installer.lua            Trae updater.lua a un ordenador vacío y lo ejecuta
+updater.lua              Comprueba GitHub, avisa y actualiza solo lo que cambió
+VERSION                  Versión instalada (la lee startup.lua y el updater)
 config/                  Configuración (sin código de lógica)
   system.lua             Nombre, logging, UI, intervalos
   peripherals.lua        Alias lógicos de periféricos
@@ -362,7 +365,27 @@ obliga a reescribirlo.
 
 ---
 
-## 13. Cómo crear un módulo nuevo
+## 13. Despliegue y actualizaciones
+
+`installer.lua` es solo un arranque: descarga `updater.lua` y lo ejecuta. Toda
+la lógica vive en el updater, así que la ruta de instalación y la de
+actualización no pueden divergir.
+
+Cómo detecta el updater si hay algo nuevo:
+
+1. Pide `GET /repos/<repo>/git/trees/<ref>?recursive=1`, que devuelve un SHA del
+   contenido completo del repositorio y otro por fichero.
+2. Compara ese SHA raíz con el de la última instalación, guardado en
+   `data/install.dat`. Iguales significa idénticos: una sola petición basta.
+3. Si difieren, compara los SHA por fichero para saber exactamente cuáles
+   cambiaron, los enseña y pregunta. Solo descarga esos.
+
+Reglas: `config/` se escribe únicamente si no existe, `data/` no se toca nunca,
+y solo se borran ficheros bajo `src/` cuando desaparecen del repositorio. Usar
+la API del árbol en lugar de un manifiesto escrito a mano significa que un
+módulo nuevo se recoge solo.
+
+## 14. Cómo crear un módulo nuevo
 
 Ver **[MODULE_DEVELOPMENT.md](MODULE_DEVELOPMENT.md)**. En una línea: crear
 `src/modules/<id>.lua`, añadir el id a `config/modules.lua` y, si se quiere en el

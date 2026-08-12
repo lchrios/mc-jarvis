@@ -55,10 +55,21 @@ local function readFile(path)
     return contents
 end
 
+--- Installed version, from the VERSION file the updater keeps in sync.
+local function readVersion()
+    local path = fs.combine(ROOT, "VERSION")
+    if not fs.exists(path) then return "dev" end
+    local handle = fs.open(path, "r")
+    if not handle then return "dev" end
+    local text = handle.readAll()
+    handle.close()
+    return (tostring(text):gsub("%s+", ""))
+end
+
 --- The BaseOS handle injected into every module environment.
 local BASEOS = {
     root = ROOT,
-    version = "0.1.0",
+    version = readVersion(),
     loaded = loaded,
 }
 
