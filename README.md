@@ -96,6 +96,7 @@ El instalador lo lanza solo en un ordenador nuevo. En todos corre el mismo
 | --- | --- |
 | **Master** | UI táctil, agrega todo, manda acciones a los nodos |
 | **Nodo** | Sin pantalla. Lee *sus* periféricos y publica su estado cada 3 s |
+| **Display** | Un monitor en cualquier punto de la base, fijo en una vista |
 
 **Los datos viven en el nodo.** El master nunca lee un periférico remoto:
 escucha, guarda la última instantánea de cada nodo y la expone como un módulo
@@ -106,6 +107,31 @@ alerta, en vez de mostrar números viejos como si fueran de ahora.
 
 Los nodos necesitan un **modem** (inalámbrico, o cableado con cable hasta el
 master). La red se enciende sola en cuanto eliges rol con `setup`.
+
+### Pantallas repartidas por la base
+
+Un **display** es un ordenador con monitor y nada más: no controla, solo enseña.
+`setup` te pregunta a qué vista lo fijas:
+
+| Vista | Qué muestra |
+| --- | --- |
+| `BASE` | Todo lo que reporte |
+| `POWER` | Solo energía |
+| `STORAGE` | Solo almacenamiento |
+| `FARMS` | Cualquier cosa tipo granja |
+| `ALERTS` / `NODES` | La lista de alertas o la salud de los nodos |
+
+Con un módulo lo enseña en grande con sus métricas y su gráfica; con varios, en
+mosaico. Si lo tocas puedes navegar, y vuelve solo a su vista al cabo de un
+minuto. Así pones una pantalla de energía en la sala del reactor y otra de
+granjas en el granero, sin duplicar lógica.
+
+### Histórico y tendencias
+
+Cada métrica numérica se muestrea en una ventana rodante. Al tocar cualquier
+métrica se abre su historia: valor actual, si sube o baja, mínimo, media, máximo
+y una gráfica. El histórico se guarda con la instantánea, así que sobrevive a un
+reinicio.
 
 Además cada ordenador guarda una instantánea en disco cada 60 s, así que tras
 un reinicio ve sus últimos valores conocidos de inmediato.

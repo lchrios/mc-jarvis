@@ -415,6 +415,9 @@ function registry.poll(id)
         record.errorMessage = nil
         record.failures = 0
         refreshStatus(record)
+        -- Whoever wants to sample this (history, telemetry) subscribes rather
+        -- than being called from here.
+        bus.emit("module.polled", { id = id })
     end
     publish(record)
     return ok

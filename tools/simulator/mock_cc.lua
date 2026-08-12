@@ -139,7 +139,17 @@ local function makeTerm(width, height, name)
         writes = 0,
         scale = 1,
     }
-    for y = 1, height do grid[y] = string.rep(" ", width) end
+    local bgGrid = {}
+    for y = 1, height do
+        grid[y] = string.rep(" ", width)
+        bgGrid[y] = string.rep("f", width)   -- "f" = black, the default
+    end
+
+    -- Colours are powers of two; map each to one hex digit for a compact dump.
+    local function colourSymbol(colour)
+        local index = math.floor(math.log(colour or 32768) / math.log(2) + 0.5)
+        return ("%x"):format(math.max(0, math.min(15, index)))
+    end
 
     function self.getSize() return self.width, self.height end
     function self.setCursorPos(x, y) self.cursorX, self.cursorY = math.floor(x), math.floor(y) end
@@ -158,7 +168,10 @@ local function makeTerm(width, height, name)
     function self.setTextScale(s) self.scale = s end
     function self.getTextScale() return self.scale end
     function self.clear()
-        for y = 1, self.height do grid[y] = string.rep(" ", self.width) end
+        for y = 1, self.height do
+            grid[y] = string.rep(" ", self.width)
+            bgGrid[y] = string.rep(colourSymbol(self.bg), self.width)
+        end
     end
     function self.clearLine() grid[self.cursorY] = string.rep(" ", self.width) end
     function self.scroll() end
@@ -172,6 +185,13 @@ local function makeTerm(width, height, name)
         if #before < x - 1 then before = before .. string.rep(" ", x - 1 - #before) end
         local after = line:sub(x + #text)
         grid[y] = (before .. text .. after):sub(1, self.width)
+
+        local bgLine = bgGrid[y] or string.rep("f", self.width)
+        local bgBefore = bgLine:sub(1, math.max(0, x - 1))
+        if #bgBefore < x - 1 then bgBefore = bgBefore .. string.rep("f", x - 1 - #bgBefore) end
+        bgGrid[y] = (bgBefore .. string.rep(colourSymbol(self.bg), #text)
+            .. bgLine:sub(x + #text)):sub(1, self.width)
+
         self.cursorX = x + #text
         self.writes = self.writes + 1
     end
@@ -181,6 +201,26 @@ local function makeTerm(width, height, name)
         for y = 1, self.height do out[#out + 1] = grid[y] end
         return table.concat(out, "\n")
     end
+
+    --- Background colours as hex digits, one per cell.
+    function self.renderBackground()
+        local out = {}
+        for y = 1, self.height do out[#out + 1] = bgGrid[y] end
+        return table.concat(out, "\n")
+    end
+
+    --- Distinct background colours inside a rectangle: { symbol = count }.
+    function self.coloursIn(x, y, w, h)
+        local seen = {}
+        for row = y, math.min(y + h - 1, self.height) do
+            for column = x, math.min(x + w - 1, self.width) do
+                local symbol = (bgGrid[row] or ""):sub(column, column)
+                if symbol ~= "" then seen[symbol] = (seen[symbol] or 0) + 1 end
+            end
+        end
+        return seen
+    end
+
     return self
 end
 
@@ -203,6 +243,10 @@ function window.create(parent, x, y, w, h, visible)
     local ownWrite = win.write
     function win.write(text)
         ownWrite(text)
+        -- Carry the colours through, so what lands on the monitor can be
+        -- checked and not just the characters.
+        parent.setBackgroundColor(win.bg)
+        parent.setTextColor(win.fg)
         parent.setCursorPos(x + win.cursorX - #tostring(text) - 1, y + win.cursorY - 1)
         parent.write(text)
     end
@@ -811,6 +855,8 @@ __TEST = {
             local function labelOf(component)
                 if component.label then return component.label end
                 if component.zone and component.zone.label then return component.zone.label end
+                -- Labels keep their text in `text`; metric rows are found this way.
+                if type(component.text) == "string" then return component.text end
                 return nil
             end
 

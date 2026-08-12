@@ -51,6 +51,15 @@ identity.PROFILES = {
         modules = { "system" },
     },
     {
+        id = "display",
+        role = "display",
+        label = "Display",
+        description = "A monitor anywhere, showing one fixed view",
+        modules = { "system" },
+        -- Which view it shows; chosen during setup, edited in data/node.dat.
+        view = { title = "BASE", modules = "*" },
+    },
+    {
         id = "custom",
         role = "node",
         label = "Custom node",
@@ -58,6 +67,24 @@ identity.PROFILES = {
         modules = nil,
     },
 }
+
+--- Views a display can be pinned to. `modules` is matched against module ids:
+--- "*" is everything, a plain string is a prefix, a list is exact ids.
+identity.VIEWS = {
+    { id = "all", title = "BASE", modules = "*", description = "Everything reporting" },
+    { id = "power", title = "POWER", modules = "power", description = "Energy only" },
+    { id = "storage", title = "STORAGE", modules = "storage", description = "Item storage only" },
+    { id = "farms", title = "FARMS", modules = "farm", description = "Anything farm-like" },
+    { id = "alerts", title = "ALERTS", screen = "alerts", description = "The alert list" },
+    { id = "nodes", title = "NODES", screen = "nodes", description = "Node health" },
+}
+
+function identity.view(id)
+    for _, view in ipairs(identity.VIEWS) do
+        if view.id == id then return view end
+    end
+    return nil
+end
 
 function identity.profile(id)
     for _, profile in ipairs(identity.PROFILES) do
@@ -130,6 +157,15 @@ end
 
 function identity.isMaster(record)
     return (record and record.role or "master") == "master"
+end
+
+function identity.isDisplay(record)
+    return record ~= nil and record.role == "display"
+end
+
+--- Roles that own a monitor and draw screens.
+function identity.hasUI(record)
+    return identity.isMaster(record) or identity.isDisplay(record)
 end
 
 return identity

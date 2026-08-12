@@ -233,8 +233,9 @@ local function drawHeader(entry)
     end
 
     local clock = util.formatClock(options.useInGameClock)
+    -- The root screen names itself too: a display pinned to POWER should say so
+    -- rather than borrowing the base-wide title.
     local title = entry and (entry.screen.title or entry.name) or options.title
-    if #stack <= 1 then title = options.title end
 
     local available = width - cursor - #clock - 1
     if available > 0 then

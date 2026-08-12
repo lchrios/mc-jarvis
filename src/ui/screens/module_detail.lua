@@ -195,6 +195,13 @@ function ModuleDetail:onLayout(x, y, w, h)
         local entry = entries[index]
         local metric = entry.metric
 
+        -- Every metric is a way in to its history.
+        local function openHistory()
+            self.context.navigation.push("metric_detail", {
+                moduleId = self.moduleId, metricId = metric.id,
+            })
+        end
+
         if entry.gauge then
             local bar = ProgressBar.new({
                 label = metric.label,
@@ -202,19 +209,27 @@ function ModuleDetail:onLayout(x, y, w, h)
                 fill = metric.color,
             })
             bar:setBounds(cx, row, cw, 2)
+            bar.onTouch = openHistory
             self:add(bar)
             self.gauges[#self.gauges + 1] = { component = bar, metric = metric }
         else
+            -- A borderless, unfilled panel is just a touch area with children.
+            local hotspot = Panel.new({
+                border = false, fill = false, onTouch = function() openHistory() return true end,
+            })
+            hotspot:setBounds(cx, row, cw, 1)
+            self:add(hotspot)
+
             local label = Label.new({ text = metric.label, fg = "textDim" })
             label:setBounds(cx, row, math.floor(cw / 2), 1)
-            self:add(label)
+            hotspot:add(label)
 
             local value = Label.new({
                 text = registry.formatMetric(metric),
                 align = "right", fg = metric.color or "text",
             })
             value:setBounds(cx + math.floor(cw / 2), row, cw - math.floor(cw / 2), 1)
-            self:add(value)
+            hotspot:add(value)
 
             self.metricRows[#self.metricRows + 1] = { component = value, metric = metric }
         end

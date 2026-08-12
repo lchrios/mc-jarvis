@@ -12,6 +12,7 @@ local util = require("core.util")
 local logger = require("core.logger")
 local state = require("core.state")
 local persistence = require("services.persistence")
+local history = require("services.history")
 
 local log = logger.scoped("snapshot")
 
@@ -36,6 +37,8 @@ function snapshot.save(ctx)
         node = ctx.identity and ctx.identity.name or nil,
         nodes = state.get("nodes", {}),
         modules = modules,
+        -- Trends are worth keeping: rebuilding a window takes minutes.
+        history = history.export(),
     })
 
     if ok then log.debug("snapshot written") end
@@ -57,6 +60,7 @@ function snapshot.restore(ctx)
     end
     state.set("nodes", nodes)
     state.set("system.restoredAt", record.savedAt)
+    if record.history then history.import(record.history) end
 
     local age = record.savedAt and ((util.nowMs() - record.savedAt) / 1000) or nil
     log.info("restored a snapshot from %s ago (%d node(s))",

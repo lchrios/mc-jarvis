@@ -103,6 +103,21 @@ __TEST.injectAt(54, function()
         .. table.concat(missing, ", ") .. ")")
 end)
 
+------------------------------------------------- a metric opens its history
+__TEST.injectAt(60, function()
+    local screen = ui.screen()
+    screen.pageIndex = 1
+    screen:layout(screen.x, screen.y, screen.w, screen.h)
+    return ui.touch("Uptime")
+end)
+
+__TEST.injectAt(66, function()
+    check(ui.screenName() == "metric_detail", "touching a metric opens its history")
+    local screen = ui.screen()
+    check(screen.metricId == "uptime", "for the metric that was touched")
+    check(screen.seriesId == "system.uptime", "reading the right history series")
+end)
+
 ---------------------------------------------------------------- run
 local source = assert(__TEST.files["startup.lua"], "startup.lua not found")
 local chunk = assert(load(source, "@startup.lua", "t", _G))

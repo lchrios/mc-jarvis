@@ -119,6 +119,10 @@ local function syncRemoteModules(ctx, snapshot)
 
         state.set("nodes." .. snapshot.node .. ".modules." .. moduleSnapshot.id, moduleSnapshot)
 
+        -- Remote modules never poll: fresh data arriving is their equivalent,
+        -- and history samples on exactly that signal.
+        bus.emit("module.polled", { id = id, remote = true })
+
         if not ctx.modules.has(id) then
             local template = ctx.require("modules.remote")
             local def = template.create({

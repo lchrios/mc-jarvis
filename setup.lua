@@ -27,6 +27,9 @@ local function describe(record)
     print("  role:    " .. tostring(record.role))
     print("  name:    " .. tostring(record.name))
     print("  profile: " .. tostring(record.profile or "custom"))
+    if record.view then
+        print("  view:    " .. tostring(record.view.title or record.view.id))
+    end
     if record.modules then
         print("  modules: " .. table.concat(record.modules, ", "))
     else
@@ -65,6 +68,33 @@ local function chooseProfile()
             return identity.PROFILES[index]
         end
         printError("Pick a number between 1 and " .. #identity.PROFILES .. ".")
+    end
+end
+
+--- A display exists to show one thing; ask which.
+local function chooseView(previous)
+    print("")
+    print("What should this display show?")
+    print("")
+    for index, view in ipairs(identity.VIEWS) do
+        print(("  %d) %-10s %s"):format(index, view.title, view.description))
+    end
+    print("")
+
+    local default = "1"
+    for index, view in ipairs(identity.VIEWS) do
+        if previous and previous.view and previous.view.id == view.id then
+            default = tostring(index)
+        end
+    end
+
+    while true do
+        local answer = ask("Number:", default)
+        local index = tonumber(answer)
+        if index and identity.VIEWS[index] then
+            return identity.VIEWS[index]
+        end
+        printError("Pick a number between 1 and " .. #identity.VIEWS .. ".")
     end
 end
 
@@ -146,6 +176,8 @@ local function main(args)
         profile = chooseProfile()
     end
 
+    local view = profile.role == "display" and chooseView(previous) or nil
+
     print("")
     local name = ask("Name for this computer:", previous and previous.name or defaultName(profile))
 
@@ -156,6 +188,7 @@ local function main(args)
         profile = profile.id,
         name = name,
         modules = profile.modules and { table.unpack(profile.modules) } or nil,
+        view = view,
         createdAt = previous and previous.createdAt or nil,
     }
 

@@ -44,11 +44,17 @@ local DEFAULTS = {
             showHeader = true,
             paddingX = 1,            -- margin between the chrome and the content
             paddingY = 1,
+            returnHomeAfter = 60,    -- a display goes back to its view after this
             minWidth = 45,           -- below this the UI refuses to draw (3x2 monitor)
             minHeight = 18,
         },
         modules = {
             defaultPollInterval = 2.0,
+        },
+        history = {
+            enabled = true,
+            capacity = 60,      -- samples kept per metric
+            minInterval = 1,    -- seconds between samples of the same metric
         },
         persistence = {
             directory = "data",

@@ -24,6 +24,7 @@ local telemetry = require("network.telemetry")
 local moduleRegistry = require("modules.registry")
 local identity = require("core.identity")
 local snapshot = require("services.snapshot")
+local history = require("services.history")
 
 local theme = require("ui.theme")
 local Renderer = require("ui.renderer")
@@ -100,6 +101,12 @@ local function registerScreens()
     end)
     navigation.register("nodes", function(params)
         return require("ui.screens.nodes").new(params)
+    end)
+    navigation.register("metric_detail", function(params)
+        return require("ui.screens.metric_detail").new(params)
+    end)
+    navigation.register("display_view", function(params)
+        return require("ui.screens.display_view").new(params)
     end)
 end
 
@@ -178,6 +185,7 @@ local function buildContext(options)
         modules = moduleRegistry,
         telemetry = telemetry,
         snapshot = snapshot,
+        history = history,
         theme = theme,
         app = app,
         identity = me,
@@ -220,7 +228,8 @@ function app.boot(options)
     -- computer that was never set up is a master, so single-computer installs
     -- keep working exactly as they did before roles existed.
     me = identity.load(options.root) or identity.default()
-    uiActive = identity.isMaster(me)
+    -- Masters and displays draw screens; nodes are headless.
+    uiActive = identity.hasUI(me)
     log.info("identity: %s '%s' (%s)", me.role, tostring(me.name),
         me.implicit and "assumed" or "configured")
 
@@ -318,12 +327,16 @@ function app.boot(options)
         network.startHeartbeat(scheduler, me.role)
     end
 
-    -- Nodes publish, masters collect. Neither reads the other's peripherals.
+    -- Nodes publish; masters and displays collect. Neither ever reads the
+    -- other's peripherals.
     if uiActive then
         telemetry.startCollector(context, config.get("network.telemetry", {}))
     else
         telemetry.startPublisher(context, config.get("network.telemetry", {}))
     end
+
+    -- Trends need samples, and samples come from module polls.
+    history.start(context, config.get("system.history", {}))
 
     -- 10. UI wiring + first paint
     if uiActive then
@@ -343,7 +356,19 @@ function app.boot(options)
     end, { owner = "app" })
     bus.on("alert.raised", function() navigation.invalidate() end, { owner = "app" })
 
-    navigation.reset(config.get("system.ui.homeScreen", "dashboard"), {})
+    -- A display boots straight into the view it was pinned to; a master gets
+    -- the dashboard. Either way that screen is the root of the stack.
+    if identity.isDisplay(me) then
+        local view = me.view or { title = "BASE", modules = "*" }
+        if view.screen then
+            navigation.reset(view.screen, { view = view })
+        else
+            navigation.reset("display_view", { view = view })
+        end
+        app.startReturnHome(config.get("system.ui.returnHomeAfter", 60))
+    else
+        navigation.reset(config.get("system.ui.homeScreen", "dashboard"), {})
+    end
 
     scheduler.every(config.get("system.ui.refreshInterval", 1.0), function()
         navigation.invalidate()
@@ -361,6 +386,25 @@ function app.boot(options)
     if uiActive then navigation.draw(true) end
     log.info("boot complete in %dms", util.nowMs() - bootTime)
     return true
+end
+
+---------------------------------------------------------------------------
+-- Display behaviour
+---------------------------------------------------------------------------
+
+local lastTouchAt = 0
+
+--- A display left on a sub-screen should go back to the view it exists to show,
+--- otherwise a passing click strands it there until someone notices.
+function app.startReturnHome(seconds)
+    if not seconds or seconds <= 0 then return nil end
+
+    return scheduler.every(math.max(5, seconds / 4), function()
+        if navigation.depth() <= 1 then return end
+        if (util.nowMs() - lastTouchAt) / 1000 < seconds then return end
+        log.debug("returning the display to its view")
+        navigation.home()
+    end, { name = "display.returnHome", owner = "app" })
 end
 
 ---------------------------------------------------------------------------
@@ -431,10 +475,14 @@ function app.handleEvent(event)
 
     if name == "monitor_touch" then
         if not displayIsTerminal and event[2] == displayName then
+            lastTouchAt = util.nowMs()
             navigation.handleTouch(event[3], event[4])
         end
     elseif name == "mouse_click" then
-        if displayIsTerminal then navigation.handleTouch(event[3], event[4]) end
+        if displayIsTerminal then
+            lastTouchAt = util.nowMs()
+            navigation.handleTouch(event[3], event[4])
+        end
     elseif name == "monitor_resize" then
         if not displayIsTerminal and event[2] == displayName then navigation.onResize() end
     elseif name == "term_resize" then
@@ -524,6 +572,7 @@ function app.shutdown()
     pcall(moduleRegistry.stopAll)
     pcall(navigation.shutdown)
     pcall(telemetry.shutdown)
+    pcall(history.shutdown)
     pcall(network.shutdown)
     pcall(peripheralManager.shutdown)
 

@@ -1,19 +1,41 @@
---- Connected peripherals and how the configured aliases resolved.
+--- Connected peripherals, as an expandable tree.
+--
+-- A flat list answered "what is attached"; the question that actually comes up
+-- is "why can BaseOS not read this thing". Touching a row unfolds it into what
+-- the peripheral reports and which alias claimed it, drawn with tree lines so
+-- the detail visibly belongs to the row above it.
 
 local class = require("core.class")
 local util = require("core.util")
 local bus = require("core.event_bus")
 local Screen = require("ui.screen")
 local List = require("ui.components.list")
-local Modal = require("ui.components.modal")
+local Label = require("ui.components.label")
 local manager = require("peripherals.manager")
 local theme = require("ui.theme")
 
 local PeripheralsScreen = class(Screen)
 
+local BRANCH, LAST_BRANCH, INDENT = "+- ", "\\- ", "   "
+
+--- Methods worth calling out, and what having them means.
+local CAPABILITIES = {
+    { method = "getEnergy", label = "energy storage" },
+    { method = "getEnergyStored", label = "energy storage" },
+    { method = "getTransferRate", label = "energy throughput" },
+    { method = "list", label = "inventory" },
+    { method = "tanks", label = "fluid tanks" },
+    { method = "listItems", label = "storage network" },
+    { method = "craftItem", label = "autocrafting" },
+    { method = "getBlockName", label = "block reader" },
+    { method = "sendMessage", label = "chat output" },
+    { method = "getPlayersInRange", label = "player detection" },
+}
+
 function PeripheralsScreen:init(params)
     Screen.init(self, params)
-    self.title = "Peripherals"
+    self.title = "Devices"
+    self.expanded = {}
 end
 
 function PeripheralsScreen:onMount()
@@ -22,85 +44,127 @@ function PeripheralsScreen:onMount()
     self:onCleanup(bus.on("peripheral.detached", refresh, { owner = "screen:peripherals" }))
 end
 
---- One row per alias, then one row per connected peripheral.
-local function buildRows()
-    local rows = {}
+---------------------------------------------------------------------------
 
-    local aliases = manager.aliasInfo()
-    for _, alias in ipairs(util.sortedKeys(aliases)) do
-        local entry = aliases[alias]
-        rows[#rows + 1] = {
-            kind = "alias",
-            alias = alias,
-            name = entry.name,
-            connected = entry.connected,
-            matcher = entry.matcher,
+--- Which alias, if any, claimed a peripheral.
+local function aliasFor(name, aliases)
+    for alias, entry in pairs(aliases) do
+        if entry.name == name then return alias end
+    end
+    return nil
+end
+
+--- Detail lines for one device, without the tree glyphs.
+local function detailLines(name, device, alias)
+    local lines = {}
+
+    lines[#lines + 1] = { text = "types: " .. table.concat(device.types or {}, ", ") }
+    lines[#lines + 1] = { text = "methods: " .. tostring(device.methodCount) }
+
+    if alias then
+        lines[#lines + 1] = { text = "alias: @" .. alias, fg = theme.get("statusOk") }
+    end
+
+    local proxy = manager.getByName(name)
+    local found = {}
+    for _, capability in ipairs(CAPABILITIES) do
+        if proxy and proxy.hasMethod(capability.method) and not found[capability.label] then
+            found[capability.label] = true
+            lines[#lines + 1] = {
+                text = "reads: " .. capability.label,
+                fg = theme.get("statusOk"),
+            }
+        end
+    end
+
+    if not next(found) then
+        lines[#lines + 1] = {
+            text = "nothing BaseOS understands - 'scan " .. name .. "'",
+            fg = theme.get("statusWarn"),
         }
     end
 
+    return lines
+end
+
+--- Flatten devices (and any expanded detail) into list rows.
+function PeripheralsScreen:buildRows()
+    local rows = {}
+    local aliases = manager.aliasInfo()
     local devices = manager.list()
-    for _, name in ipairs(util.sortedKeys(devices)) do
+    local names = util.sortedKeys(devices)
+
+    -- Unbound aliases first: a missing device is the thing you came to see.
+    for _, alias in ipairs(util.sortedKeys(aliases)) do
+        if not aliases[alias].connected then
+            rows[#rows + 1] = {
+                kind = "missing",
+                text = "@" .. alias .. "  (unbound, wants "
+                    .. tostring(aliases[alias].matcher and aliases[alias].matcher.type or "any") .. ")",
+                fg = theme.get("statusWarn"),
+            }
+        end
+    end
+
+    for _, name in ipairs(names) do
         local device = devices[name]
+        local isOpen = self.expanded[name] == true
+        local alias = aliasFor(name, aliases)
+
         rows[#rows + 1] = {
             kind = "device",
             name = name,
-            types = device.types,
-            methodCount = device.methodCount,
+            text = (isOpen and "[-] " or "[+] ") .. name .. (alias and ("  @" .. alias) or ""),
+            fg = theme.get("text"),
         }
+
+        if isOpen then
+            local lines = detailLines(name, device, alias)
+            for index, line in ipairs(lines) do
+                local glyph = (index == #lines) and LAST_BRANCH or BRANCH
+                rows[#rows + 1] = {
+                    kind = "detail",
+                    name = name,
+                    text = INDENT .. glyph .. line.text,
+                    fg = line.fg or theme.get("textDim"),
+                }
+            end
+        end
     end
 
     return rows
 end
 
-local function renderRow(row, width)
-    if row.kind == "alias" then
-        local target = row.connected and row.name or "(unbound)"
-        return {
-            text = util.padRight("@" .. row.alias, math.max(10, math.floor(width / 2))) .. target,
-            fg = row.connected and theme.get("statusOk") or theme.get("statusWarn"),
-        }
-    end
-    return {
-        text = util.padRight(row.name, math.max(10, math.floor(width / 2)))
-            .. table.concat(row.types or {}, ", "),
-        fg = theme.get("text"),
-    }
-end
-
-function PeripheralsScreen:showDetail(row)
-    local lines
-    if row.kind == "alias" then
-        lines = "Alias: " .. row.alias
-            .. "\nBound to: " .. (row.name or "nothing")
-            .. "\nWants type: " .. tostring(row.matcher and row.matcher.type or "any")
-    else
-        lines = "Peripheral: " .. row.name
-            .. "\nTypes: " .. table.concat(row.types or {}, ", ")
-            .. "\nMethods: " .. tostring(row.methodCount)
-    end
-
-    self:openModal(Modal.new({
-        title = row.kind == "alias" and "Alias" or "Peripheral",
-        message = lines,
-        buttons = { { label = "CLOSE" } },
-        onClose = function() self:closeModal() end,
-    }))
-end
-
 function PeripheralsScreen:onLayout(x, y, w, h)
     local width = w - 2
-    self.list = List.new({
-        items = buildRows(),
-        renderItem = function(row) return renderRow(row, width) end,
-        emptyText = "No peripherals detected.",
-        onSelect = function(row) self:showDetail(row) end,
+
+    local header = Label.new({
+        text = tostring(manager.count()) .. " device(s) - touch one to expand",
+        fg = "textDim",
     })
-    self.list:setBounds(x + 1, y, width, h)
+    header:setBounds(x + 1, y, width, 1)
+    self:add(header)
+
+    self.list = List.new({
+        items = self:buildRows(),
+        renderItem = function(row)
+            return { text = util.truncate(row.text, width), fg = row.fg }
+        end,
+        emptyText = "No peripherals detected. Check the wired modems are enabled.",
+        onSelect = function(row)
+            if row.kind == "device" or row.kind == "detail" then
+                self.expanded[row.name] = not self.expanded[row.name]
+                self:requestLayout()
+            end
+        end,
+    })
+    self.list:setBounds(x + 1, y + 1, width, math.max(1, h - 1))
     self:add(self.list)
 end
 
 function PeripheralsScreen:update()
-    if self.list then self.list:setItems(buildRows()) end
+    -- Rows only change on expand/collapse or attach/detach, both of which
+    -- relayout; refreshing the text every frame would fight the scroll offset.
 end
 
 return PeripheralsScreen

@@ -21,6 +21,7 @@ node run.js scenarios/node.lua           # a headless node publishing telemetry
 node run.js scenarios/master.lua         # a master ingesting node telemetry
 node run.js scenarios/setup.lua          # the setup wizard and factory reset
 MONITOR_W=57 MONITOR_H=24 node run.js scenarios/detail_scroll.lua  # metric paging
+node run.js scenarios/display.lua        # a display node pinned to one view
 node run.js scenarios/resilience.lua     # no monitor + forced alert
 node run.js scenarios/modal.lua          # confirm dialog + log viewer
 node run.js scenarios/installer.lua      # install from a fake GitHub, then boot
@@ -49,8 +50,10 @@ roughly half a minute of simulated uptime.
   barrel that fills while its control side is powered (enough to drive the farm
   module end to end); adapters for ME Bridge, Powah and friends must still be
   verified in game.
-* Exact `window` blitting and colour output - the mock writes straight through
-  to the parent terminal and records characters only, not colours.
+* Exact `window` blitting. The mock writes straight through to the parent and
+  records background colours per cell (`__TEST.monitor.coloursIn(x, y, w, h)`),
+  which is how colour-drawn things like gauges and sparklines are checked, but
+  it is not a pixel-accurate renderer.
 * Rednet between computers.
 
 ## Adding a scenario

@@ -4,7 +4,7 @@
   "private": true,
   "description": "Runs BaseOS outside Minecraft under a real Lua VM with a mocked CC:Tweaked API",
   "scripts": {
-    "test": "node run.js scenarios/dashboard.lua && node run.js scenarios/farm.lua && node run.js scenarios/resilience.lua && node run.js scenarios/modal.lua && node run.js scenarios/installer.lua && node run.js scenarios/updater.lua && node run.js scenarios/power.lua && node run.js scenarios/scan.lua && node run.js scenarios/node.lua && node run.js scenarios/master.lua && node run.js scenarios/setup.lua && node run.js scenarios/detail_scroll.lua"
+    "test": "node run.js scenarios/dashboard.lua && node run.js scenarios/farm.lua && node run.js scenarios/resilience.lua && node run.js scenarios/modal.lua && node run.js scenarios/installer.lua && node run.js scenarios/updater.lua && node run.js scenarios/power.lua && node run.js scenarios/scan.lua && node run.js scenarios/node.lua && node run.js scenarios/master.lua && node run.js scenarios/setup.lua && node run.js scenarios/detail_scroll.lua && node run.js scenarios/display.lua"
   },
   "dependencies": {
     "wasmoon": "^1.16.0"
