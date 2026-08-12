@@ -12,7 +12,10 @@ núcleo pequeño de servicios sobre el que se enchufan módulos.
 ## 1. Estructura de directorios
 
 ```
-startup.lua              Bootstrap: cargador de módulos + arranque de core.app
+startup.lua              Arranque: carga boot.lua y entrega el control a core.app
+boot.lua                 Cargador de módulos compartido por todos los programas
+setup.lua                Elige el rol de este ordenador (master / nodo)
+reset.lua                Reset de fábrica: borra config y datos locales
 installer.lua            Trae updater.lua a un ordenador vacío y lo ejecuta
 updater.lua              Comprueba GitHub, avisa y actualiza solo lo que cambió
 version.lua              Imprime la versión instalada (sin red)
@@ -35,6 +38,7 @@ src/
     state.lua            Store central observable
     util.lua             Helpers puros (formato, tablas, tiempo)
     class.lua            Herencia mínima para componentes de UI
+    identity.lua         Rol de este ordenador (data/node.dat)
   peripherals/
     manager.lua          Único dueño de la API `peripheral`
   adapters/
@@ -52,6 +56,8 @@ src/
     power.lua            Energía agregada
     storage.lua          Almacenamiento (red o inventarios)
     demo_farm.lua        Granja simulada para validar la UI
+    farm.lua             Plantilla de granja real (instancias por config)
+    remote.lua           Proxy de un módulo que corre en otro ordenador
   ui/
     renderer.lua         Primitivas de dibujo sobre monitor o terminal
     navigation.lua       Registro de pantallas, pila y cromo (header/footer)
@@ -65,9 +71,11 @@ src/
   network/
     protocol.lua         Formato de mensaje (sobre + tipos)
     network.lua          Transporte rednet
+    telemetry.lua        Push de métricas nodo -> master y acciones al revés
   services/
     alerts.lua           Alertas activas con severidad
     persistence.lua      Guardado/carga en `data/`
+    snapshot.lua         Volcado periódico del estado a disco
 data/                    Runtime: log, estado persistido (ignorado por git)
 docs/                    Esta documentación
 tools/simulator/         Ejecuta BaseOS fuera de Minecraft (desarrollo)
@@ -335,6 +343,53 @@ cada poll e inunda el log. `modules/demo_farm.lua` y `modules/power.lua`
 muestran el patrón (levantar al 90%, limpiar al 80%).
 
 ---
+
+## 10.b Identidad y roles
+
+Cada ordenador guarda qué es en `data/node.dat`, fuera de todo lo que el updater
+toca. Lo escribe `setup.lua`, lo borra `reset.lua` y nadie más.
+
+```lua
+{ role = "master", profile = "master", name = "mainframe",
+  modules = { "system", "power", "storage" } }
+```
+
+* `core.identity` lee y escribe el fichero y define los perfiles del asistente.
+* `core.app` se ramifica en el arranque: un **master** monta display, tema,
+  navegación y pantallas; un **nodo** se salta todo eso (`uiActive = false`),
+  no enruta toques y pinta un resumen de texto en su terminal.
+* Los módulos que carga salen de `identity.modules`, con `config/modules.lua`
+  como respaldo. Las instancias de plantilla (granjas) se añaden siempre.
+* Un ordenador sin identidad se asume **master**, así que una instalación de un
+  solo equipo sigue funcionando igual que antes de que existieran los roles.
+* `ctx.hasUI` le dice a un módulo si hay pantallas: sin él, un nodo ofrecería al
+  master acciones que abren vistas y fallarían al llegar.
+
+## 10.c Telemetría
+
+Los datos son del nodo. El master **nunca** lee un periférico remoto.
+
+```
+NODO                                    MASTER
+  poll local de sus periféricos
+  cada publishInterval (3 s):
+    broadcast metrics.update  ───────>  guarda en state.nodes.<nodo>
+                                        registra un módulo proxy por cada
+                                        módulo reportado (modules.remote)
+                                        el dashboard lo trata como local
+  ejecuta la acción         <───────    command.execute (al pulsar un botón)
+    responde command.result ───────>
+  publica al recibir        <───────    state.request (master recién arrancado)
+```
+
+* Es **push**, no polling: el nodo emite solo. `state.request` existe únicamente
+  para que un master recién arrancado no espere al siguiente tick.
+* `modules.remote` es una plantilla: su `metrics`, `status` y `tile` salen de la
+  última instantánea en `core.state`, y sus acciones se reenvían por rednet.
+* Si un nodo calla más de `staleAfter` (15 s), se marca offline, sus módulos
+  pasan a `OFFLINE`, sus acciones se desactivan y se levanta una alerta.
+* `services.snapshot` vuelca a `data/snapshot.dat` cada 60 s y restaura al
+  arrancar, marcando siempre lo restaurado como no vivo.
 
 ## 11. Red
 

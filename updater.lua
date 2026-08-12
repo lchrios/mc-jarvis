@@ -28,7 +28,8 @@ local OBSOLETE = { "VERSION" }
 
 --- Only these paths belong on the computer; docs and tools stay in the repo.
 local INCLUDE = {
-    "startup.lua", "installer.lua", "updater.lua", "version.lua", "scan.lua",
+    "startup.lua", "boot.lua", "installer.lua", "updater.lua",
+    "version.lua", "scan.lua", "setup.lua", "reset.lua",
     "baseos.version", "src/", "config/",
 }
 

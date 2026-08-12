@@ -52,7 +52,8 @@ local DEFAULTS = {
         },
         persistence = {
             directory = "data",
-            autosaveInterval = 60,
+            -- Seconds between on-disk snapshots of the current values.
+            snapshotInterval = 60,
         },
     },
 
@@ -88,6 +89,10 @@ local DEFAULTS = {
         modemSide = nil,
         heartbeatInterval = 10,
         peerTimeout = 30,
+        telemetry = {
+            publishInterval = 3,   -- seconds between a node's metric pushes
+            staleAfter = 15,       -- silence after which a node counts as offline
+        },
     },
 
     theme = {

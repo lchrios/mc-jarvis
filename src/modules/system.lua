@@ -89,33 +89,31 @@ function system.tile(self)
 end
 
 function system.actions(self)
-    return {
-        {
+    local actions = {}
+
+    -- Screen-opening actions only exist where there are screens: on a node
+    -- these would be offered to the master and fail on arrival.
+    if self.ctx and self.ctx.hasUI then
+        actions[#actions + 1] = {
             id = "peripherals",
             label = "DEVICES",
-            run = function()
-                if self.ctx and self.ctx.navigation then
-                    self.ctx.navigation.push("peripherals", {})
-                end
-            end,
-        },
-        {
+            run = function() self.ctx.navigation.push("peripherals", {}) end,
+        }
+        actions[#actions + 1] = {
             id = "logs",
             label = "LOGS",
-            run = function()
-                if self.ctx and self.ctx.navigation then
-                    self.ctx.navigation.push("logs", {})
-                end
-            end,
-        },
-        {
-            id = "reboot",
-            label = "REBOOT",
-            style = "danger",
-            confirm = "Reboot this computer?",
-            run = function() os.reboot() end,
-        },
+            run = function() self.ctx.navigation.push("logs", {}) end,
+        }
+    end
+
+    actions[#actions + 1] = {
+        id = "reboot",
+        label = "REBOOT",
+        style = "danger",
+        confirm = "Reboot this computer?",
+        run = function() os.reboot() end,
     }
+    return actions
 end
 
 return system

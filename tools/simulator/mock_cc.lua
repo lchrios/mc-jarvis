@@ -655,12 +655,25 @@ function http.get(url)
 end
 http.checkURL = function() return true end
 
+---------------------------------------------------------------- rednet
+-- Records what this computer sent and lets a scenario inject what it would
+-- have received. Two computers are never simulated at once: each side is
+-- driven against the protocol instead, which is what actually has to hold.
+local sent = {}
+local rednetOpen = {}
+
 rednet = {
-    isOpen = function() return false end,
-    open = function() error("no modem") end,
-    close = function() end,
-    send = function() return true end,
-    broadcast = function() return true end,
+    isOpen = function(side) return rednetOpen[side] == true end,
+    open = function(side) rednetOpen[side] = true end,
+    close = function(side) rednetOpen[side] = nil end,
+    send = function(id, message, protocol)
+        sent[#sent + 1] = { target = id, message = message, protocol = protocol }
+        return true
+    end,
+    broadcast = function(message, protocol)
+        sent[#sent + 1] = { target = "*", message = message, protocol = protocol }
+        return true
+    end,
     host = function() end,
     unhost = function() end,
     lookup = function() return nil end,
@@ -688,6 +701,37 @@ __TEST = {
     farmOutput = farmOutput,
     --- Current redstone output state, as the farm module left it.
     redstone = function(side) return redstoneOutputs[side] == true end,
+
+    --- Attach a modem so networking can come up.
+    addModem = function(name, wireless)
+        peripherals[name or "modem_0"] = {
+            types = { "modem" },
+            object = {
+                isWireless = function() return wireless == true end,
+                open = function() end,
+                close = function() end,
+                transmit = function() end,
+            },
+        }
+    end,
+
+    --- Everything this computer put on the wire.
+    sentMessages = function() return sent end,
+    lastSent = function(messageType)
+        for index = #sent, 1, -1 do
+            local entry = sent[index]
+            if not messageType or (entry.message and entry.message.type == messageType) then
+                return entry
+            end
+        end
+        return nil
+    end,
+    clearSent = function() for index = #sent, 1, -1 do sent[index] = nil end end,
+
+    --- Deliver a rednet message as if another computer had sent it.
+    receive = function(senderId, message, protocol)
+        queue[#queue + 1] = { "rednet_message", senderId, message, protocol or "baseos" }
+    end,
     queueTouch = function(x, y) queue[#queue + 1] = { "monitor_touch", "monitor_0", x, y } end,
     --- Deliver a touch as the Nth event, so timers get a chance to run first.
     touchAt = function(index, x, y) injections[index] = { "monitor_touch", "monitor_0", x, y } end,

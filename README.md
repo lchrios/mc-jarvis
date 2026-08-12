@@ -72,6 +72,57 @@ No hace falta configurar nada para el primer arranque: con `config/` vacío
 BaseOS arranca igual usando los valores por defecto, y sin monitor cae a la
 terminal del ordenador.
 
+## Varios ordenadores: master y nodos
+
+Cada ordenador tiene un **rol**, que se elige una vez y se guarda en
+`data/node.dat`. El updater nunca lo toca, así que no se vuelve a preguntar.
+
+```
+setup
+```
+
+```
+  1) Master         Touch UI, aggregates every node
+  2) Power node     Reads energy storage, reports to the master
+  3) Storage node   Reads item storage, reports to the master
+  4) Farm node      Runs farm instances from config/modules.lua
+  5) Custom node    Modules come from config/modules.lua
+```
+
+El instalador lo lanza solo en un ordenador nuevo. En todos corre el mismo
+`startup.lua`: el rol decide qué arranca.
+
+| Rol | Qué hace |
+| --- | --- |
+| **Master** | UI táctil, agrega todo, manda acciones a los nodos |
+| **Nodo** | Sin pantalla. Lee *sus* periféricos y publica su estado cada 3 s |
+
+**Los datos viven en el nodo.** El master nunca lee un periférico remoto:
+escucha, guarda la última instantánea de cada nodo y la expone como un módulo
+más — en el dashboard un módulo remoto se ve y se pulsa igual que uno local, y
+sus botones se reenvían al nodo que los ejecuta. Si un nodo deja de reportar
+15 s, sus módulos pasan a `OFFLINE`, se desactivan sus acciones y salta una
+alerta, en vez de mostrar números viejos como si fueran de ahora.
+
+Los nodos necesitan un **modem** (inalámbrico, o cableado con cable hasta el
+master). La red se enciende sola en cuanto eliges rol con `setup`.
+
+Además cada ordenador guarda una instantánea en disco cada 60 s, así que tras
+un reinicio ve sus últimos valores conocidos de inmediato.
+
+## Rescatar un equipo
+
+| Comando | Qué hace |
+| --- | --- |
+| `setup` | Cambiar el rol; pregunta si borrar la config del rol anterior |
+| `setup show` | Ver el rol actual |
+| `reset` | Borra `config/` y `data/` (rol incluido). Pide escribir `RESET` |
+| `reset --keep-setup` | Igual, pero conserva el rol |
+| `reset --data` | Solo datos de runtime (logs, caché) |
+
+`reset` nunca toca los ficheros del programa: después, `updater force` restaura
+la config por defecto.
+
 ## Qué hay ya funcionando
 
 * Arranque completo con cargador de módulos propio, logger, configuración,

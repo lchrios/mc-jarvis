@@ -20,7 +20,10 @@ local adapters = require("adapters.registry")
 local persistence = require("services.persistence")
 local alerts = require("services.alerts")
 local network = require("network.network")
+local telemetry = require("network.telemetry")
 local moduleRegistry = require("modules.registry")
+local identity = require("core.identity")
+local snapshot = require("services.snapshot")
 
 local theme = require("ui.theme")
 local Renderer = require("ui.renderer")
@@ -36,6 +39,8 @@ local displayName = nil
 local displayIsTerminal = false
 local bootTime = util.nowMs()
 local context = nil
+local me = nil          -- this computer's identity
+local uiActive = false  -- false on a node: there is no UI to route touches to
 
 ---------------------------------------------------------------------------
 -- Display
@@ -126,6 +131,21 @@ local function statusProvider()
     }
 
     segments[#segments + 1] = { label = "Modules", value = tostring(moduleRegistry.count()) }
+
+    -- Only worth a slot once this base actually has nodes.
+    local total, online = 0, 0
+    for _, node in pairs(state.get("nodes", {})) do
+        total = total + 1
+        if node.online then online = online + 1 end
+    end
+    if total > 0 then
+        segments[#segments + 1] = {
+            label = "Nodes",
+            value = online .. "/" .. total,
+            color = online == total and theme.get("statusOk") or theme.get("statusWarn"),
+        }
+    end
+
     return segments
 end
 
@@ -153,8 +173,13 @@ local function buildContext(options)
         network = network,
         navigation = navigation,
         modules = moduleRegistry,
+        telemetry = telemetry,
+        snapshot = snapshot,
         theme = theme,
         app = app,
+        identity = me,
+        -- Modules must not offer actions that open screens on a headless node.
+        hasUI = uiActive,
     }
 end
 
@@ -187,12 +212,23 @@ function app.boot(options)
         root = options.root,
     })
     state.reset()
+
+    -- Who am I? Written once by `setup` and never touched by the updater. A
+    -- computer that was never set up is a master, so single-computer installs
+    -- keep working exactly as they did before roles existed.
+    me = identity.load(options.root) or identity.default()
+    uiActive = identity.isMaster(me)
+    log.info("identity: %s '%s' (%s)", me.role, tostring(me.name),
+        me.implicit and "assumed" or "configured")
+
     state.set("system", {
         name = config.get("system.name", "BASE CONTROL"),
         version = options.version,
         computerId = os.getComputerID(),
         label = os.getComputerLabel(),
-        role = config.get("system.nodeRole", "master"),
+        role = me.role,
+        node = me.name,
+        profile = me.profile,
         bootTime = bootTime,
     })
 
@@ -207,28 +243,32 @@ function app.boot(options)
     adapters.setPeripheralManager(peripheralManager)
     adapters.load(config.get("adapters.extra", {}), options.require)
 
-    -- 6. Display
-    renderer = resolveDisplay()
-    if not renderer then
+    -- 6. Display. Nodes are headless: no monitor, no navigation, no touches.
+    renderer = uiActive and resolveDisplay() or nil
+    if uiActive and not renderer then
         error("no display available: attach a monitor or enable system.ui.useTerminalFallback", 0)
     end
-    if displayIsTerminal then
-        -- The renderer owns the terminal now; keep the log off it.
+    -- Whoever owns the terminal - the UI fallback, or a node's status display -
+    -- must not have the log scribbling over it.
+    if (renderer and displayIsTerminal) or not uiActive then
         logger.configure({ toTerminal = false })
     end
 
-    theme.apply({
-        preset = config.get("theme.preset", "dark"),
-        overrides = config.get("theme.overrides", {}),
-        chars = config.get("theme.chars", nil),
-        monochrome = not renderer:supportsColor(),
-    })
+    if renderer then
+        theme.apply({
+            preset = config.get("theme.preset", "dark"),
+            overrides = config.get("theme.overrides", {}),
+            chars = config.get("theme.chars", nil),
+            monochrome = not renderer:supportsColor(),
+        })
 
-    local width, height = renderer:size()
-    state.set("system.display", { name = displayName, width = width, height = height })
-    log.info("display: %s (%dx%d)", displayName, width, height)
+        local width, height = renderer:size()
+        state.set("system.display", { name = displayName, width = width, height = height })
+        log.info("display: %s (%dx%d)", displayName, width, height)
+    end
 
     -- 7. UI
+    if uiActive then
     navigation.init(renderer, {
         title = config.get("system.name", "BASE CONTROL"),
         showHeader = config.get("system.ui.showHeader", true),
@@ -241,30 +281,49 @@ function app.boot(options)
     })
     registerScreens()
     navigation.setStatusProvider(statusProvider)
+    end
 
     -- 8. Modules
     context = buildContext(options)
     moduleRegistry.setContext(context)
     moduleRegistry.watchPeripherals()
-    -- Plain modules first, then template instances (farms, reactors, ...).
+    -- The identity decides which modules this computer runs; config is the
+    -- fallback for a custom node and for installs that never ran `setup`.
     local moduleEntries = {}
-    for _, id in ipairs(config.get("modules.enabled", {})) do
+    for _, id in ipairs(me.modules or config.get("modules.enabled", {})) do
         moduleEntries[#moduleEntries + 1] = id
     end
     for _, instance in ipairs(config.get("modules.instances", {})) do
         moduleEntries[#moduleEntries + 1] = instance
     end
     moduleRegistry.load(moduleEntries, options.require)
+
+    -- Last known values are back before the first poll, so a reboot shows data
+    -- immediately instead of an empty dashboard.
+    snapshot.restore(context)
     moduleRegistry.setupAll()
     moduleRegistry.startAll()
 
-    -- 9. Network (a no-op unless enabled in config)
-    network.init(config.section("network"))
+    -- 9. Network. A node is useless without it, and a computer whose role was
+    -- chosen deliberately belongs to a multi-computer base, so both turn it on.
+    -- An install that never ran `setup` keeps the config default (off).
+    local networkSettings = util.deepCopy(config.section("network"))
+    networkSettings.enabled = networkSettings.enabled or not me.implicit
+    networkSettings.hostname = networkSettings.hostname or me.name
+    network.init(networkSettings)
     if network.isReady() then
-        network.startHeartbeat(scheduler, config.get("system.nodeRole", "master"))
+        network.startHeartbeat(scheduler, me.role)
+    end
+
+    -- Nodes publish, masters collect. Neither reads the other's peripherals.
+    if uiActive then
+        telemetry.startCollector(context, config.get("network.telemetry", {}))
+    else
+        telemetry.startPublisher(context, config.get("network.telemetry", {}))
     end
 
     -- 10. UI wiring + first paint
+    if uiActive then
     bus.on("ui.footer_touch", function() navigation.push("alerts", {}) end, { owner = "app" })
     bus.on("ui.header_touch", function()
         if navigation.depth() == 1 then navigation.push("module_list", {}) end
@@ -273,15 +332,65 @@ function app.boot(options)
 
     navigation.reset(config.get("system.ui.homeScreen", "dashboard"), {})
 
-    -- 11. Timers
     scheduler.every(config.get("system.ui.refreshInterval", 1.0), function()
         navigation.invalidate()
     end, { name = "ui.refresh", owner = "app" })
+    else
+        -- A node still owes an explanation to whoever opens its terminal.
+        scheduler.every(3, app.printNodeStatus,
+            { name = "node.status", owner = "app", immediate = true })
+    end
+
+    -- 11. Timers
+    snapshot.start(context, config.get("system.persistence.snapshotInterval", 60))
     scheduler.start()
 
-    navigation.draw(true)
+    if uiActive then navigation.draw(true) end
     log.info("boot complete in %dms", util.nowMs() - bootTime)
     return true
+end
+
+---------------------------------------------------------------------------
+-- Node terminal
+---------------------------------------------------------------------------
+
+--- A node has no monitor, so its terminal is the only place it can report.
+function app.printNodeStatus()
+    local target = term.native and term.native() or term
+    if not target then return end
+
+    pcall(function()
+        target.clear()
+        target.setCursorPos(1, 1)
+
+        local lines = {
+            "BaseOS node  " .. tostring(context and context.version or "?"),
+            "",
+            "name:    " .. tostring(me and me.name),
+            "profile: " .. tostring(me and me.profile or "custom"),
+            "network: " .. (network.isReady()
+                and ("online as '" .. tostring(network.hostname()) .. "'")
+                or "OFFLINE - attach a modem"),
+            "uptime:  " .. util.formatDuration(app.uptime()),
+            "",
+            "modules:",
+        }
+
+        for _, record in ipairs(moduleRegistry.all()) do
+            lines[#lines + 1] = ("  %-14s %s"):format(record.id,
+                record.statusText or tostring(record.status))
+        end
+
+        lines[#lines + 1] = ""
+        lines[#lines + 1] = "alerts: " .. alerts.count()
+        lines[#lines + 1] = "'setup' changes this computer's role."
+
+        local _, height = target.getSize()
+        for index = 1, math.min(#lines, height) do
+            target.setCursorPos(1, index)
+            target.write(lines[index])
+        end
+    end)
 end
 
 ---------------------------------------------------------------------------
@@ -303,6 +412,9 @@ function app.handleEvent(event)
 
     -- Every raw event is available on the bus under its own name.
     bus.emit(name, table.unpack(event, 2, event.n))
+
+    -- A node has no UI: everything below here is master-only routing.
+    if not uiActive then return true end
 
     if name == "monitor_touch" then
         if not displayIsTerminal and event[2] == displayName then
@@ -326,6 +438,7 @@ end
 
 --- Re-resolve the display after a peripheral change.
 function app.checkDisplay()
+    if not uiActive then return end
     local monitor = peripheralManager.get("mainMonitor") or peripheralManager.firstOfType("monitor")
 
     if monitor and monitor.name() ~= displayName then
@@ -369,7 +482,7 @@ function app.loop()
             running = false
         end
 
-        if running then
+        if running and uiActive then
             local drawn, err = pcall(navigation.draw)
             if not drawn then log.error("draw failed: %s", tostring(err)) end
         end
@@ -392,9 +505,12 @@ function app.uptime() return (util.nowMs() - bootTime) / 1000 end
 
 function app.shutdown()
     log.info("shutting down")
+    -- Persist before stopping: a clean shutdown should not lose the last values.
+    if context then pcall(snapshot.save, context) end
     pcall(scheduler.stop)
     pcall(moduleRegistry.stopAll)
     pcall(navigation.shutdown)
+    pcall(telemetry.shutdown)
     pcall(network.shutdown)
     pcall(peripheralManager.shutdown)
 

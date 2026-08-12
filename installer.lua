@@ -51,3 +51,16 @@ end
 -- `install` skips the confirmation prompt: asking "do you want to install?"
 -- right after the user typed `installer` is noise.
 chunk("install", ref)
+
+-- A fresh computer has no identity yet, so ask what it is before it boots into
+-- the wrong role. An existing install already knows and is left alone.
+if not fs.exists("data/node.dat") and fs.exists("setup.lua") then
+    print("")
+    local setupHandle = fs.open("setup.lua", "r")
+    if setupHandle then
+        local setupSource = setupHandle.readAll()
+        setupHandle.close()
+        local setupChunk = load(setupSource, "@setup.lua", "t", _ENV or _G)
+        if setupChunk then pcall(setupChunk) end
+    end
+end

@@ -1,137 +1,30 @@
---- BaseOS bootstrap.
+--- BaseOS entry point.
 --
--- ComputerCraft's shell provides a `require` for programs, but its behaviour has
--- changed across versions and it is not available when a file is run with
--- `os.run`/`dofile`. BaseOS therefore ships its own tiny module loader so the
--- rest of the project can use plain `require("core.app")` style imports no
--- matter how it was started.
---
--- Search order for `require("a.b")`:
---   <root>/src/a/b.lua
---   <root>/src/a/b/init.lua
---   <root>/a/b.lua
---   <root>/a/b/init.lua
+-- Bootstraps the shared module loader (boot.lua) and hands control to
+-- `core.app`, which decides what to run from this computer's identity: the
+-- touch UI on a master, a headless collector on a node.
 
-local function resolveRoot()
-    local program = "startup.lua"
-    if shell and shell.getRunningProgram then
-        program = shell.getRunningProgram()
+local function bootstrap()
+    local handle = fs.open("boot.lua", "r")
+    if not handle then
+        error("boot.lua is missing. Run 'updater force' to repair the install.", 0)
     end
-    local dir = fs.getDir(program)
-    if dir == nil or dir == "." or dir == ".." then dir = "" end
-    return dir
-end
-
-local ROOT = resolveRoot()
-
-local SEARCH_PATTERNS = {
-    "src/?.lua",
-    "src/?/init.lua",
-    "?.lua",
-    "?/init.lua",
-}
-
-local baseEnv = _ENV or _G
-local loaded = {}
-local loading = {}
-local bosRequire
-
-local function findModuleFile(name)
-    local relative = name:gsub("%.", "/")
-    for _, pattern in ipairs(SEARCH_PATTERNS) do
-        local candidate = fs.combine(ROOT, (pattern:gsub("%?", relative)))
-        if fs.exists(candidate) and not fs.isDir(candidate) then
-            return candidate
-        end
-    end
-    return nil
-end
-
-local function readFile(path)
-    local handle = fs.open(path, "r")
-    if not handle then return nil end
-    local contents = handle.readAll()
+    local source = handle.readAll()
     handle.close()
-    return contents
+
+    local chunk, err = load(source, "@boot.lua", "t", _ENV or _G)
+    if not chunk then error("boot.lua is corrupt: " .. tostring(err), 0) end
+    return chunk()
 end
-
---- Installed version, from the file the updater keeps in sync.
--- Deliberately not called "VERSION": on a case-insensitive host filesystem
--- the shell resolves `version` to it and tries to run it as a program.
-local function readVersion()
-    local path = fs.combine(ROOT, "baseos.version")
-    if not fs.exists(path) then return "dev" end
-    local handle = fs.open(path, "r")
-    if not handle then return "dev" end
-    local text = handle.readAll()
-    handle.close()
-    return (tostring(text):gsub("%s+", ""))
-end
-
---- The BaseOS handle injected into every module environment.
-local BASEOS = {
-    root = ROOT,
-    version = readVersion(),
-    loaded = loaded,
-}
-
-bosRequire = function(name)
-    if type(name) ~= "string" then
-        error("require expects a module name (string)", 2)
-    end
-
-    local cached = loaded[name]
-    if cached ~= nil then return cached end
-
-    if loading[name] then
-        error("circular require detected while loading '" .. name .. "'", 2)
-    end
-
-    local path = findModuleFile(name)
-    if not path then
-        error("module '" .. name .. "' not found (root: '" .. ROOT .. "')", 2)
-    end
-
-    local source = readFile(path)
-    if not source then
-        error("unable to read module file '" .. path .. "'", 2)
-    end
-
-    local env = setmetatable({
-        require = bosRequire,
-        BASEOS = BASEOS,
-        __MODULE__ = name,
-        __FILE__ = path,
-    }, { __index = baseEnv })
-    env._ENV = env
-
-    local chunk, err = load(source, "@" .. path, "t", env)
-    if not chunk then
-        error("syntax error in '" .. path .. "': " .. tostring(err), 2)
-    end
-
-    loading[name] = true
-    local ok, result = pcall(chunk)
-    loading[name] = nil
-
-    if not ok then
-        error("error loading '" .. name .. "': " .. tostring(result), 0)
-    end
-
-    if result == nil then result = true end
-    loaded[name] = result
-    return result
-end
-
-BASEOS.require = bosRequire
-
--- Expose the loader globally so a user can poke at modules from the shell
--- (`lua` prompt) while debugging without re-bootstrapping.
-_G.BASEOS = BASEOS
 
 local ok, err = pcall(function()
-    local app = bosRequire("core.app")
-    return app.run({ root = ROOT, require = bosRequire, version = BASEOS.version })
+    local BASEOS = bootstrap()
+    local app = BASEOS.require("core.app")
+    return app.run({
+        root = BASEOS.root,
+        require = BASEOS.require,
+        version = BASEOS.version,
+    })
 end)
 
 if not ok then
@@ -147,4 +40,7 @@ if not ok then
     print("BaseOS stopped with an error:")
     print(tostring(err))
     if term and term.setTextColor then pcall(term.setTextColor, colors.white) end
+    print("")
+    print("'scan' inspects peripherals, 'setup' changes this computer's role,")
+    print("'reset' wipes it back to a clean install.")
 end

@@ -17,6 +17,9 @@ node run.js                              # dashboard walkthrough on an 82x25 mon
 node run.js scenarios/farm.lua           # real farm module against a real barrel
 node run.js scenarios/power.lua          # many energy devices + the list pager
 node run.js scenarios/scan.lua           # the `scan` peripheral diagnostic
+node run.js scenarios/node.lua           # a headless node publishing telemetry
+node run.js scenarios/master.lua         # a master ingesting node telemetry
+node run.js scenarios/setup.lua          # the setup wizard and factory reset
 node run.js scenarios/resilience.lua     # no monitor + forced alert
 node run.js scenarios/modal.lua          # confirm dialog + log viewer
 node run.js scenarios/installer.lua      # install from a fake GitHub, then boot
@@ -59,6 +62,10 @@ Drop a `.lua` file into `scenarios/`. Useful helpers exposed by the mock:
 | `__TEST.ui.back()` | a touch on the header back button |
 | `__TEST.ui.screenName()` | which screen is on top of the stack |
 | `__TEST.injectAt(eventIndex, producer)` | deliver `producer()`'s event as the Nth event |
+| `__TEST.queueInput(...)` | answers handed to the next `read()` prompts |
+| `__TEST.addModem(name)` | attach a modem so networking comes up |
+| `__TEST.lastSent(type)` | the last rednet message this computer sent |
+| `__TEST.receive(id, msg)` | deliver a rednet message as if a node sent it |
 | `__TEST.errors()` | failures inside scenario hooks (BaseOS would hide them) |
 | `__TEST.crashed()` | true if startup.lua printed its crash banner |
 | `__TEST.touchAt(eventIndex, x, y)` | deliver a `monitor_touch` as the Nth event |
