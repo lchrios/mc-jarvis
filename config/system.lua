@@ -31,10 +31,12 @@ return {
         paddingX = 1,
         paddingY = 1,
 
-        -- Por debajo de esto la UI muestra "MONITOR TOO SMALL" en lugar de
-        -- dibujar algo ilegible. Tamaño recomendado: monitor de 3x2 o mayor.
-        minWidth = 26,
-        minHeight = 10,
+        -- Tamaño mínimo real. Por debajo la UI muestra "MONITOR TOO SMALL"
+        -- en lugar de dibujar algo ilegible. Estos valores exigen un monitor
+        -- de 3x2 bloques y siguen permitiendo la terminal del ordenador
+        -- (51x19), que es el respaldo cuando no hay monitor.
+        minWidth = 45,
+        minHeight = 18,
     },
 
     modules = {

@@ -236,8 +236,8 @@ function app.boot(options)
         useInGameClock = config.get("system.useInGameClock", true),
         paddingX = config.get("system.ui.paddingX", 1),
         paddingY = config.get("system.ui.paddingY", 1),
-        minWidth = config.get("system.ui.minWidth", 26),
-        minHeight = config.get("system.ui.minHeight", 10),
+        minWidth = config.get("system.ui.minWidth", 45),
+        minHeight = config.get("system.ui.minHeight", 18),
     })
     registerScreens()
     navigation.setStatusProvider(statusProvider)

@@ -126,15 +126,14 @@ function power.metrics(self)
     if self.throughput then
         metrics[#metrics + 1] = { id = "flow", label = "Throughput", value = self.throughput, unit = "FE/t" }
     end
-    for _, source in ipairs(self.sources or {}) do
-        metrics[#metrics + 1] = {
-            id = "src." .. source.name,
-            label = source.name,
-            kind = "percent",
-            value = source.percentage or 0,
-        }
-    end
+    -- The per-device breakdown lives in the detail screen, not here: a dozen
+    -- cells would bury the totals under a wall of gauges.
     return metrics
+end
+
+--- Custom detail view with a scrollable device breakdown.
+function power.detailScreen(params)
+    return require("ui.screens.power_detail").new(params)
 end
 
 function power.tile(self)

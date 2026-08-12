@@ -44,8 +44,8 @@ local DEFAULTS = {
             showHeader = true,
             paddingX = 1,            -- margin between the chrome and the content
             paddingY = 1,
-            minWidth = 26,           -- below this the UI refuses to draw
-            minHeight = 10,
+            minWidth = 45,           -- below this the UI refuses to draw (3x2 monitor)
+            minHeight = 18,
         },
         modules = {
             defaultPollInterval = 2.0,

@@ -28,8 +28,11 @@ local options = {
     paddingX = 1,
     paddingY = 1,
     -- Below this the UI is not worth drawing; say so instead of rendering mush.
-    minWidth = 26,
-    minHeight = 10,
+    -- Sized to demand a 3x2 monitor while still allowing the 51x19 computer
+    -- terminal, which is the fallback when no monitor is attached.
+    minWidth = 45,
+    minHeight = 18,
+    minHint = "a 3x2 monitor",
 }
 local statusProvider = nil
 local dirty = true
@@ -266,12 +269,20 @@ local function drawTooSmall()
     local width, height = renderer:size()
     renderer:beginFrame()
     renderer:clear("background")
-    local row = math.max(1, math.floor(height / 2) - 1)
-    renderer:writeCentered(1, row, width, "MONITOR TOO SMALL", "statusError", "background")
-    renderer:writeCentered(1, row + 1, width,
-        ("have %dx%d"):format(width, height), "textDim", "background")
-    renderer:writeCentered(1, row + 2, width,
-        ("need %dx%d"):format(options.minWidth, options.minHeight), "textDim", "background")
+
+    local lines = {
+        { text = "MONITOR TOO SMALL", fg = "statusError" },
+        { text = ("have %dx%d"):format(width, height), fg = "textDim" },
+        { text = ("need %dx%d"):format(options.minWidth, options.minHeight), fg = "textDim" },
+        { text = options.minHint, fg = "text" },
+    }
+
+    local row = math.max(1, math.floor((height - #lines) / 2) + 1)
+    for _, line in ipairs(lines) do
+        if row > height then break end
+        renderer:writeCentered(1, row, width, line.text, line.fg, "background")
+        row = row + 1
+    end
     renderer:endFrame()
 end
 

@@ -30,8 +30,8 @@ adaptadores por mod y una UI táctil pensada para monitores de CC.
 
 Necesitas un **Advanced Computer** y un **Advanced Monitor** (los normales no
 generan eventos táctiles). Tamaño de monitor **mínimo recomendado: 3x2 bloques**
-(~57x24 caracteres a escala 0.5); por debajo de 26x10 la UI avisa en lugar de
-dibujar algo ilegible. Con el ordenador abierto:
+(~57x24 caracteres a escala 0.5). Un 2x2 o menor se rechaza con un aviso en
+pantalla en lugar de dibujar algo ilegible. Con el ordenador abierto:
 
 ```
 wget https://raw.githubusercontent.com/lchrios/mc-jarvis/main/installer.lua installer

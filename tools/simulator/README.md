@@ -15,6 +15,7 @@ npm install
 npm test                                 # run every scenario
 node run.js                              # dashboard walkthrough on an 82x25 monitor
 node run.js scenarios/farm.lua           # real farm module against a real barrel
+node run.js scenarios/power.lua          # many energy devices + the list pager
 node run.js scenarios/resilience.lua     # no monitor + forced alert
 node run.js scenarios/modal.lua          # confirm dialog + log viewer
 node run.js scenarios/installer.lua      # install from a fake GitHub, then boot

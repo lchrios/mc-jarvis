@@ -90,7 +90,10 @@ function ModuleDetail:onLayout(x, y, w, h)
     local snapshot = registry.snapshot(self.moduleId) or {}
     local actions = registry.actions(self.moduleId)
 
-    local actionRows = #actions > 0 and 3 or 0
+    -- Three-row buttons are a far easier touch target on a monitor than the
+    -- single row they used to be; fall back to one row when space is tight.
+    local buttonHeight = (#actions > 0 and h >= 12) and 3 or 1
+    local actionRows = #actions > 0 and (buttonHeight + 1) or 0
     local bodyHeight = math.max(3, h - actionRows)
 
     local body = Panel.new({ title = record.name, bg = "background", fg = "border" })
@@ -164,7 +167,7 @@ function ModuleDetail:onLayout(x, y, w, h)
 
     -- Action row
     if actionRows > 0 then
-        local buttonY = y + h - 2
+        local buttonY = y + h - buttonHeight
         local slots = self.context and self.context.navigation
             and self.context.navigation.getRenderer():distribute(x + 1, w - 2, #actions, 1)
             or nil
@@ -178,9 +181,9 @@ function ModuleDetail:onLayout(x, y, w, h)
             })
             local slot = slots and slots[index]
             if slot then
-                button:setBounds(slot.offset, buttonY, slot.size, 1)
+                button:setBounds(slot.offset, buttonY, slot.size, buttonHeight)
             else
-                button:setBounds(x + 1 + (index - 1) * 12, buttonY, 11, 1)
+                button:setBounds(x + 1 + (index - 1) * 12, buttonY, 11, buttonHeight)
             end
             self:add(button)
         end

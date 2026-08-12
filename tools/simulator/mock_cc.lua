@@ -710,6 +710,31 @@ __TEST = {
     end,
     --- What the fake GitHub serves (defaults to the project on disk).
     remote = function() return remote end,
+    --- Attach `count` energy peripherals, to exercise the power breakdown and
+    --- the list pager. Every third one also reports a transfer rate.
+    addEnergyCells = function(count, options)
+        options = options or {}
+        for index = 1, count do
+            local capacity = 1000000 * index
+            local stored = capacity * (0.05 + (index % 7) * 0.14)
+            local object = {
+                getEnergy = function() return math.floor(stored) end,
+                getEnergyCapacity = function() return capacity end,
+            }
+            if index % 3 == 0 then
+                object.getTransferRate = function() return 120 * index end
+            end
+            local isPowah = options.powah and index % 4 == 0
+            if isPowah then
+                object.getGenerationRate = function() return 80 * index end
+            end
+            peripherals[(isPowah and "powah:energy_cell_" or "energy_cell_") .. index] = {
+                types = { "energy_storage", isPowah and "powah:energy_cell_basic" or "energyDetector" },
+                object = object,
+            }
+        end
+    end,
+
     --- Answers handed to the next `read()` prompts, in order.
     queueInput = function(...)
         for _, answer in ipairs({ ... }) do inputQueue[#inputQueue + 1] = answer end

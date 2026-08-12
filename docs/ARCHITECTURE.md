@@ -298,7 +298,8 @@ en `monitor_resize` / `term_resize`. Adaptaciones automáticas:
 | Área grande | Separación de 2 (`layout.gap = "auto"`) |
 | Tile más alto que su contenido | El contenido se centra verticalmente |
 | Tile de menos de 4 filas | Se omite la línea de estado |
-| Menor que `system.ui.minWidth/minHeight` (26x10) | Se muestra "MONITOR TOO SMALL" |
+| Lista más larga que su alto | Aparece un paginador `^ UP / n-m / DOWN v` con botones de 3 filas |
+| Menor que `system.ui.minWidth/minHeight` (45x18) | Se muestra "MONITOR TOO SMALL" con el tamaño real y el necesario |
 
 Tamaño recomendado: monitor de **3x2 bloques o mayor** (~57x24 caracteres).
 
