@@ -51,6 +51,9 @@ local DEFAULTS = {
         modules = {
             defaultPollInterval = 2.0,
         },
+        activity = {
+            limit = 40,          -- notable events kept for the dashboard feed
+        },
         history = {
             enabled = true,
             capacity = 60,      -- samples kept per metric

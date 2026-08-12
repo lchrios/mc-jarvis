@@ -14,7 +14,9 @@ local function check(condition, message)
     return false
 end
 
--- More cells than fit on screen, so the pager has to appear.
+-- The subject here is the pager, which only appears when the list overflows,
+-- so the monitor size is pinned rather than inherited.
+__TEST.resizeMonitor(82, 25)
 __TEST.addEnergyCells(22, { powah = true })
 
 __TEST.files["config/layout.lua"] = [[
@@ -41,16 +43,20 @@ local function list()
     return nil
 end
 
-__TEST.injectAt(20, function()
-    local data = power()
-    check(data ~= nil, "the power module is registered")
-    check(#(data.sources or {}) == 22, "all 22 energy devices were discovered")
-    check((data.capacity or 0) > 0, "capacities were aggregated")
-    return ui.touch("POWER")
+__TEST.injectAt(16, function()
+    check(power() ~= nil, "the power module is registered")
+    -- Zone tiles live on the map screen now.
+    return ui.touch("MAP")
 end)
 
+__TEST.injectAt(20, function() return ui.touch("POWER") end)
+
 local firstPage
-__TEST.injectAt(26, function()
+__TEST.injectAt(30, function()
+    -- Asserted after the module has had a poll interval to read its devices.
+    local data = power()
+    check(#(data.sources or {}) == 22, "all 22 energy devices were discovered")
+    check((data.capacity or 0) > 0, "capacities were aggregated")
     check(ui.screenName() == "module_detail", "the power zone opens a detail screen")
     local component = list()
     check(component ~= nil, "the detail screen has a device list")
@@ -63,23 +69,23 @@ __TEST.injectAt(26, function()
     return ui.touch("DOWN v")
 end)
 
-__TEST.injectAt(32, function()
+__TEST.injectAt(36, function()
     local component = list()
     check(component and component.offset > 0, "DOWN scrolls the list")
     return ui.touch("^ UP")
 end)
 
-__TEST.injectAt(38, function()
+__TEST.injectAt(42, function()
     local component = list()
     check(component and component.offset == 0, "UP scrolls back to the top")
 end)
 
 -- Paging past the end must clamp, not run off into empty rows.
-__TEST.injectAt(42, function() return ui.touch("DOWN v") end)
 __TEST.injectAt(46, function() return ui.touch("DOWN v") end)
 __TEST.injectAt(50, function() return ui.touch("DOWN v") end)
 __TEST.injectAt(54, function() return ui.touch("DOWN v") end)
-__TEST.injectAt(58, function()
+__TEST.injectAt(58, function() return ui.touch("DOWN v") end)
+__TEST.injectAt(62, function()
     local component = list()
     check(component and component.offset == component:maxOffset(),
         "paging past the end clamps to the last page")

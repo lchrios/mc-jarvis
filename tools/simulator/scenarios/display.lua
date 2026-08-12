@@ -87,14 +87,14 @@ __TEST.injectAt(30, function()
 end)
 
 ---------------------------------------------------------------- history
-__TEST.injectAt(36, function()
+__TEST.injectAt(44, function()
     return { "rednet_message", 7, snapshotFrom("power_node", 0.70), "baseos" }
 end)
-__TEST.injectAt(42, function()
+__TEST.injectAt(64, function()
     return { "rednet_message", 7, snapshotFrom("power_node", 0.55), "baseos" }
 end)
 
-__TEST.injectAt(56, function()
+__TEST.injectAt(72, function()
     local history = BASEOS.loaded["services.history"]
     local seriesId = "power_node.power.charge"
     check(history.has(seriesId), "the display records history for what it shows")
@@ -107,7 +107,7 @@ __TEST.injectAt(56, function()
 end)
 
 -------------------------------------------------------------- the chart
-__TEST.injectAt(58, function()
+__TEST.injectAt(78, function()
     local screen = ui.screen()
     check(screen.chart ~= nil, "a chart appears once there is history to draw")
 
@@ -124,19 +124,19 @@ __TEST.injectAt(58, function()
 end)
 
 ---------------------------------------------------------- returning home
-__TEST.injectAt(60, function()
+__TEST.injectAt(84, function()
     local navigation = BASEOS.loaded["ui.navigation"]
     navigation.push("nodes", {})
     check(navigation.depth() == 2, "a display can still be navigated by hand")
 end)
 
-__TEST.injectAt(64, function()
+__TEST.injectAt(88, function()
     -- The return-home task only fires once the idle timeout has passed; make it
     -- immediate rather than waiting a simulated minute.
     BASEOS.loaded["core.app"].startReturnHome(0.001)
 end)
 
-__TEST.injectAt(90, function()
+__TEST.injectAt(150, function()
     local navigation = BASEOS.loaded["ui.navigation"]
     check(navigation.depth() == 1, "and returns to its view when left alone")
     check(ui.screenName() == "display_view", "back on the pinned view")

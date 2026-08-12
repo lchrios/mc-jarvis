@@ -68,7 +68,9 @@ __TEST.injectAt(12, function()
     end
 end)
 
--- Open the farm detail view and start it.
+-- Open the farm detail view and start it. Zone tiles live on the map screen,
+-- which the dashboard action bar opens.
+__TEST.injectAt(16, function() return ui.touch("MAP") end)
 __TEST.injectAt(20, function() return ui.touch("MOB FARM") end)
 __TEST.injectAt(24, function()
     check(ui.screenName() == "module_detail", "the farm tile opens its detail view")

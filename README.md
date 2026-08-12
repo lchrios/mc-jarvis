@@ -183,9 +183,33 @@ Todo vive en `config/`, sin lógica:
 Mover una sala del plano, renombrar una zona o añadir una habitación es editar
 `config/layout.lua`. Nada más.
 
+### El dashboard
+
+La pantalla principal no es una rejilla de cajas iguales: es un panel de mando
+con cifras arriba, sistemas en vivo, lo que acaba de pasar, y acciones abajo.
+
+```
+ ALERTS              MODULES
+ 0                   4
+
+ SYSTEMS                            ACTIVITY
+ * System      ONLINE   ID 7           12s Mob Farm -> BACKED UP
+ * Power       OK       [####--] 82%   1m  node farm_node went silent
+ * Storage     NETWORK  12.4k items
+ * Mob Farm    BACKED UP[#####-] 91%
+
+     MAP        NODES      ALERTS     DEVICES      LOGS
+```
+
+Las cifras de arriba son navegables (tocar **ALERTS** abre las alertas), cada
+sistema abre su detalle, y la barra inferior lleva a las pantallas que se usan a
+diario. En monitores estrechos el feed de actividad se retira antes que nada
+esencial.
+
 ### El mapa de la base
 
-El dashboard es un plano: cajas que colocas tú y tuberías que se trazan solas.
+El plano vive en su **propia pantalla** (botón `MAP`, o como vista fija de un
+display): cajas que colocas tú y tuberías que se trazan solas.
 
 ```
 +---------------+   +----------------+   +---------------+

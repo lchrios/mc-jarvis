@@ -420,7 +420,10 @@ function os.startTimer(delay)
     return timerSeq
 end
 function os.cancelTimer() end
-function os.epoch() startTime = startTime + 120 return startTime end
+-- Virtual time advances per *event*, not per call. Advancing on every
+-- os.epoch() made the clock run faster whenever a screen happened to ask the
+-- time more often, so a UI change could silently retime every scenario.
+function os.epoch() return startTime end
 function os.time() return 12.5 end
 function os.day() return 42 end
 function os.getComputerID() return 7 end
@@ -445,8 +448,11 @@ end
 local injections = {}     -- [eventIndex] = event or producer, instead of the queue
 local harnessErrors = {}  -- failures inside scenario hooks
 
+local MS_PER_EVENT = 150
+
 function os.pullEventRaw()
     processed = processed + 1
+    startTime = startTime + MS_PER_EVENT
     if lastEvent == "monitor_touch" then snapshot("after touch #" .. #snapshots + 1) end
     if processed > MAX_EVENTS then
         snapshot("final")
@@ -745,6 +751,12 @@ __TEST = {
     farmOutput = farmOutput,
     --- Current redstone output state, as the farm module left it.
     redstone = function(side) return redstoneOutputs[side] == true end,
+
+    --- Pin the monitor size, for scenarios whose subject is the layout itself
+    --- and which must not change meaning with MONITOR_W/MONITOR_H.
+    resizeMonitor = function(width, height)
+        monitor.width, monitor.height = width, height
+    end,
 
     --- Attach a modem so networking can come up.
     addModem = function(name, wireless)

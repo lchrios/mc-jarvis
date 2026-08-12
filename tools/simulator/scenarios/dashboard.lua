@@ -1,10 +1,9 @@
--- Default scenario: boot on a monitor and walk the UI, asserting the effect of
--- every interaction.
+-- The main dashboard: headline figures, live systems, activity, actions.
 --
 -- Touches are located by label at delivery time, never by coordinate, so the
--- walkthrough keeps testing the same buttons after a layout change. They are
--- also spaced out over the event stream so the scheduler polls in between and
--- the snapshots show live data instead of boot values.
+-- walkthrough keeps testing the same controls after a layout change. They are
+-- spaced out over the event stream so the scheduler polls in between and the
+-- snapshots show live data instead of boot values.
 
 local ui = __TEST.ui
 local failures = {}
@@ -17,29 +16,58 @@ local function check(condition, message)
 end
 
 local function farm() return BASEOS.loaded["modules.demo_farm"] end
+local function screen() return ui.screen() end
 
--- { event index, what to touch, what must be true afterwards }
+--- The systems list, which draws its own rows and so has no findable labels.
+local function systemsList()
+    for _, child in ipairs(screen() and screen().children or {}) do
+        if child.drawItem then return child end
+    end
+    return nil
+end
+
 local steps = {
-    { 30, function() return ui.touch("CENTRAL HUB") end },
-    { 33, nil, function() check(ui.screenName() == "module_detail", "hub opens the detail screen") end },
+    { 24, nil, function()
+        check(ui.screenName() == "dashboard", "the dashboard is the home screen")
+        local list = systemsList()
+        check(list ~= nil, "there is a systems list")
+        check(list and #list.items == 4, "every module has a row")
+    end },
 
+    -- The stat row doubles as navigation.
+    { 28, function() return ui.touch("Alerts") end },
+    { 32, nil, function() check(ui.screenName() == "alerts", "the ALERTS stat opens the alert list") end },
     { 36, function() return ui.back() end },
-    { 39, nil, function() check(ui.screenName() == "dashboard", "back returns to the dashboard") end },
 
-    { 42, function() return ui.touch("DEMO FARM") end },
-    { 45, function() return ui.touch("STOP") end },
-    { 48, nil, function() check(farm().running == false, "STOP stops the farm") end },
+    -- Touching a system row opens that module.
+    { 40, function()
+        local list = systemsList()
+        if not list then return nil end
+        -- Rows are painted, not components: address one by position.
+        return { "monitor_touch", "monitor_0", list.x + 2, list.y }
+    end },
+    { 44, nil, function()
+        check(ui.screenName() == "module_detail", "a system row opens its module")
+    end },
+    { 48, function() return ui.back() end },
 
-    { 51, function() return ui.touch("START") end },
-    { 54, nil, function() check(farm().running == true, "START restarts the farm") end },
+    -- The action bar.
+    { 52, function() return ui.touch("MAP") end },
+    { 56, nil, function() check(ui.screenName() == "map", "MAP opens the base plan") end },
+    { 60, function() return ui.back() end },
 
-    { 57, function() return ui.back() end },
-    { 60, function() return ui.touch("ALERTS") end },
-    { 63, nil, function() check(ui.screenName() == "alerts", "the alerts zone opens the alerts screen") end },
+    { 64, function() return ui.touch("DEVICES") end },
+    { 68, nil, function() check(ui.screenName() == "peripherals", "DEVICES opens the device tree") end },
+    { 72, function() return ui.back() end },
 
-    { 66, function() return ui.back() end },
-    { 69, function() return ui.touch("ALL MODULES") end },
-    { 72, nil, function() check(ui.screenName() == "module_list", "the modules zone opens the list") end },
+    -- Anything notable shows up in the feed.
+    { 76, nil, function()
+        local activity = BASEOS.loaded["services.activity"]
+        check(activity.count() > 0, "the activity feed recorded something")
+    end },
+    { 80, nil, function()
+        check(ui.screenName() == "dashboard", "and we are back on the dashboard")
+    end },
 }
 
 for _, step in ipairs(steps) do
@@ -65,15 +93,6 @@ for index, snap in ipairs(__TEST.snapshots()) do
 end
 
 print(("events processed: %d, pending: %d"):format(__TEST.processed(), __TEST.pending()))
-
-if BASEOS and BASEOS.loaded["core.scheduler"] then
-    print("--- scheduler tasks ---")
-    for _, task in ipairs(BASEOS.loaded["core.scheduler"].list()) do
-        print(("  %-24s every %.2fs runs=%d failures=%d"):format(
-            task.name, task.interval, task.runs, task.failures))
-    end
-end
-
 print("run ok: " .. tostring(ok) .. (ok and "" or (" err=" .. tostring(runError))))
 
 local log = __TEST.files["data/baseos.log"]
@@ -81,14 +100,11 @@ if log and log:find("%[ERROR%]") then
     print(log)
     error("log contains ERROR entries", 0)
 end
--- A crashed run must fail the scenario, not just print a line. BaseOS catches
--- its own errors, so check the harness and the crash banner too.
 if not ok then error("startup crashed: " .. tostring(runError), 0) end
 for _, harnessError in ipairs(__TEST.errors()) do
     check(false, "harness: " .. harnessError)
 end
 check(not __TEST.crashed(), "startup.lua printed its crash banner")
-if #failures > 0 then
-    error(#failures .. " UI assertion(s) failed", 0)
-end
-print("all UI assertions passed")
+
+if #failures > 0 then error(#failures .. " UI assertion(s) failed", 0) end
+print("all dashboard assertions passed")

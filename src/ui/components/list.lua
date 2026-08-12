@@ -16,13 +16,17 @@ local List = class(Component)
 --- Rows reserved at the bottom for the pager buttons.
 local PAGER_HEIGHT = Pager.HEIGHT
 
---- @param options table { items, renderItem, onSelect, emptyText, bg,
----                        showScrollbar, pager }
+--- @param options table { items, renderItem, drawItem, onSelect, emptyText,
+---                        bg, showScrollbar, pager }
+--- `renderItem(item, index)` returns text; `drawItem(renderer, item, index,
+--- x, y, width)` takes the row over entirely, for rows with meters or colour
+--- runs that plain text cannot express.
 function List:init(options)
     Component.init(self, options)
     options = options or {}
     self.items = options.items or {}
     self.renderItem = options.renderItem
+    self.drawItem = options.drawItem
     self.onSelect = options.onSelect
     self.emptyText = options.emptyText or "(empty)"
     self.bg = options.bg or "background"
@@ -118,21 +122,33 @@ function List:draw(renderer)
     for row = 1, math.min(rows, #self.items - self.offset) do
         local index = row + self.offset
         local item = self.items[index]
+        local rowY = self.y + row - 1
 
-        local rendered
-        if type(self.renderItem) == "function" then
-            local ok, result = pcall(self.renderItem, item, index)
-            rendered = normaliseRow(ok and result or "<render error>")
+        if self.drawItem then
+            -- The owner paints the whole row: meters and colour runs cannot be
+            -- expressed as a string.
+            local ok, err = pcall(self.drawItem, renderer, item, index, self.x, rowY, width)
+            if not ok then
+                renderer:write(self.x, rowY,
+                    util.truncate("draw error: " .. tostring(err), width), "statusError", self.bg)
+            end
         else
-            rendered = normaliseRow(type(item) == "table" and (item.text or item.label or "?") or item)
+            local rendered
+            if type(self.renderItem) == "function" then
+                local ok, result = pcall(self.renderItem, item, index)
+                rendered = normaliseRow(ok and result or "<render error>")
+            else
+                rendered = normaliseRow(
+                    type(item) == "table" and (item.text or item.label or "?") or item)
+            end
+
+            local isSelected = self.selected ~= nil and self.selected == index
+            local bg = rendered.bg or (isSelected and theme.get("accent") or self.bg)
+            local fg = rendered.fg or (isSelected and theme.get("accentText") or "text")
+
+            renderer:fill(self.x, rowY, width, 1, bg, " ")
+            renderer:write(self.x, rowY, util.truncate(rendered.text, width), fg, bg)
         end
-
-        local isSelected = self.selected ~= nil and self.selected == index
-        local bg = rendered.bg or (isSelected and theme.get("accent") or self.bg)
-        local fg = rendered.fg or (isSelected and theme.get("accentText") or "text")
-
-        renderer:fill(self.x, self.y + row - 1, width, 1, bg, " ")
-        renderer:write(self.x, self.y + row - 1, util.truncate(rendered.text, width), fg, bg)
     end
 
     if scrollbar then

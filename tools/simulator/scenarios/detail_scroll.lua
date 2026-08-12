@@ -17,6 +17,9 @@ local function check(condition, message)
     return false
 end
 
+-- Paging only happens when the metrics do not fit, so pin a small monitor.
+__TEST.resizeMonitor(57, 24)
+
 __TEST.files["config/layout.lua"] = [[
 return {
     mode = "grid",
@@ -46,6 +49,8 @@ end
 
 local firstPage, secondPage
 
+-- Zone tiles live on the map screen; the dashboard action bar opens it.
+__TEST.injectAt(16, function() return ui.touch("MAP") end)
 __TEST.injectAt(20, function() return ui.touch("CENTRAL HUB") end)
 
 __TEST.injectAt(26, function()

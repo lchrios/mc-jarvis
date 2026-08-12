@@ -25,6 +25,7 @@ local moduleRegistry = require("modules.registry")
 local identity = require("core.identity")
 local snapshot = require("services.snapshot")
 local history = require("services.history")
+local activity = require("services.activity")
 
 local theme = require("ui.theme")
 local Renderer = require("ui.renderer")
@@ -108,6 +109,9 @@ local function registerScreens()
     navigation.register("display_view", function(params)
         return require("ui.screens.display_view").new(params)
     end)
+    navigation.register("map", function(params)
+        return require("ui.screens.base_map").new(params)
+    end)
 end
 
 --- Footer segments: overall status, power (when the module exists) and alerts.
@@ -186,6 +190,7 @@ local function buildContext(options)
         telemetry = telemetry,
         snapshot = snapshot,
         history = history,
+        activity = activity,
         theme = theme,
         app = app,
         identity = me,
@@ -337,6 +342,7 @@ function app.boot(options)
 
     -- Trends need samples, and samples come from module polls.
     history.start(context, config.get("system.history", {}))
+    activity.start(context)
 
     -- 10. UI wiring + first paint
     if uiActive then
@@ -573,6 +579,7 @@ function app.shutdown()
     pcall(navigation.shutdown)
     pcall(telemetry.shutdown)
     pcall(history.shutdown)
+    pcall(activity.shutdown)
     pcall(network.shutdown)
     pcall(peripheralManager.shutdown)
 

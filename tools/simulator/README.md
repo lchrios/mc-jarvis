@@ -41,9 +41,13 @@ moves the touch instead of silently missing it.
 ## What the mock covers
 
 `fs`, `term`, `window`, `peripheral`, `colors`, `textutils`, `os` (timers,
-events, epoch, computer id), a stub `rednet` and `shell`. Virtual time only
-advances when the code asks for it (`os.epoch`), so a run of ~100 events covers
-roughly half a minute of simulated uptime.
+events, epoch, computer id), `redstone`, `http`, `read`/`write` and a recording
+`rednet`.
+
+Virtual time advances **per event** (150ms each), not per `os.epoch` call: with
+the latter, a screen that happened to ask the time more often made the clock run
+faster, so a UI change could silently retime every scenario. A run of 200 events
+is about 30 seconds of simulated uptime.
 
 ## What it does *not* cover
 
@@ -69,6 +73,7 @@ Drop a `.lua` file into `scenarios/`. Useful helpers exposed by the mock:
 | `__TEST.injectAt(eventIndex, producer)` | deliver `producer()`'s event as the Nth event |
 | `__TEST.queueInput(...)` | answers handed to the next `read()` prompts |
 | `__TEST.addModem(name)` | attach a modem so networking comes up |
+| `__TEST.resizeMonitor(w, h)` | pin the monitor size for layout-sensitive scenarios |
 | `__TEST.lastSent(type)` | the last rednet message this computer sent |
 | `__TEST.receive(id, msg)` | deliver a rednet message as if a node sent it |
 | `__TEST.errors()` | failures inside scenario hooks (BaseOS would hide them) |

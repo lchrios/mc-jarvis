@@ -67,8 +67,11 @@ local function pipeCount(a, b)
 end
 
 ---------------------------------------------------------------- routed
+-- The map is its own screen now, reached from the dashboard action bar.
+__TEST.injectAt(18, function() return ui.touch("MAP") end)
+
 __TEST.injectAt(22, function()
-    check(ui.screenName() == "dashboard", "the map is the dashboard")
+    check(ui.screenName() == "map", "the MAP action opens the base map")
     check(#segments() > 0, "links were routed (" .. #segments() .. " cells)")
 
     check(linkState("power", "hub") ~= nil, "power is wired to the hub")
@@ -94,7 +97,7 @@ end)
 ---------------------------------------------------------------- stopped
 __TEST.injectAt(32, function() return ui.touch("DEMO FARM") end)
 __TEST.injectAt(36, function() return ui.touch("STOP") end)
-__TEST.injectAt(40, function() return ui.back() end)
+__TEST.injectAt(40, function() return ui.back() end)   -- back to the map
 
 __TEST.injectAt(46, function()
     check(linkState("farm", "hub") == "idle",

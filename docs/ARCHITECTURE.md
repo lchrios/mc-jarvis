@@ -68,13 +68,15 @@ src/
     base_links.lua       Trazado de las conexiones entre zonas
     components/          label, button, panel, progress_bar, list, modal,
                          pager, zone_tile
-    screens/             dashboard, module_detail, module_list, alerts,
-                         peripherals, logs, nodes, power_detail
+    screens/             dashboard, base_map, module_detail, metric_detail,
+                         module_list, alerts, peripherals, logs, nodes,
+                         power_detail, display_view
   network/
     protocol.lua         Formato de mensaje (sobre + tipos)
     network.lua          Transporte rednet
     telemetry.lua        Push de métricas nodo -> master y acciones al revés
   services/
+    activity.lua         Eventos recientes para el feed del dashboard
     alerts.lua           Alertas activas con severidad
     persistence.lua      Guardado/carga en `data/`
     snapshot.lua         Volcado periódico del estado a disco
