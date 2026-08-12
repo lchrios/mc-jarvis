@@ -55,9 +55,11 @@ local function readFile(path)
     return contents
 end
 
---- Installed version, from the VERSION file the updater keeps in sync.
+--- Installed version, from the file the updater keeps in sync.
+-- Deliberately not called "VERSION": on a case-insensitive host filesystem
+-- the shell resolves `version` to it and tries to run it as a program.
 local function readVersion()
-    local path = fs.combine(ROOT, "VERSION")
+    local path = fs.combine(ROOT, "baseos.version")
     if not fs.exists(path) then return "dev" end
     local handle = fs.open(path, "r")
     if not handle then return "dev" end

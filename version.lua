@@ -38,7 +38,9 @@ local function countFiles(state)
     return total
 end
 
-local version = readFile("VERSION")
+-- Older installs kept it in "VERSION"; that name shadowed this program on a
+-- case-insensitive filesystem, hence the rename.
+local version = readFile("baseos.version") or readFile("VERSION")
 version = version and version:gsub("%s+", "") or "unknown"
 
 local state = readState()

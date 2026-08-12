@@ -18,9 +18,17 @@ local REPO = "lchrios/mc-jarvis"
 local DEFAULT_REF = "main"
 local STATE_FILE = "data/install.dat"
 
+--- Where the installed version string lives. Not "VERSION": on a
+--- case-insensitive filesystem the shell resolves `version` to that file and
+--- tries to run it as a program instead of running version.lua.
+local VERSION_FILE = "baseos.version"
+
+--- Files that used to ship and must be removed from existing installs.
+local OBSOLETE = { "VERSION" }
+
 --- Only these paths belong on the computer; docs and tools stay in the repo.
 local INCLUDE = {
-    "startup.lua", "installer.lua", "updater.lua", "version.lua", "VERSION",
+    "startup.lua", "installer.lua", "updater.lua", "version.lua", "baseos.version",
     "src/", "config/",
 }
 
@@ -102,8 +110,8 @@ local function writeState(state)
 end
 
 local function localVersion()
-    if not fs.exists("VERSION") then return nil end
-    local handle = fs.open("VERSION", "r")
+    if not fs.exists(VERSION_FILE) then return nil end
+    local handle = fs.open(VERSION_FILE, "r")
     if not handle then return nil end
     local text = handle.readAll()
     handle.close()
@@ -140,8 +148,8 @@ local function remoteTree(ref)
 end
 
 local function remoteVersion(ref)
-    local url = ("https://raw.githubusercontent.com/%s/%s/VERSION"):format(REPO, ref)
-    local body = fetch(url, "VERSION", true)
+    local url = ("https://raw.githubusercontent.com/%s/%s/%s"):format(REPO, ref, VERSION_FILE)
+    local body = fetch(url, VERSION_FILE, true)
     return body and (body:gsub("%s+", "")) or nil
 end
 
@@ -172,6 +180,13 @@ local function plan(state, remote, force)
     -- Files that used to be installed and are gone upstream.
     for path in pairs(known) do
         if not remote.files[path] and matchesPrefix(path, PRUNABLE) and fs.exists(path) then
+            result.removed[#result.removed + 1] = path
+        end
+    end
+
+    -- Leftovers from older layouts, whether or not they are in the record.
+    for _, path in ipairs(OBSOLETE) do
+        if not remote.files[path] and fs.exists(path) then
             result.removed[#result.removed + 1] = path
         end
     end
@@ -262,8 +277,14 @@ local function main(args)
     print("  available: " .. (available or "unknown") .. "  " .. shortSha(remote.sha))
     print("")
 
+    local leftovers = false
+    for _, path in ipairs(OBSOLETE) do
+        if fs.exists(path) then leftovers = true end
+    end
+
     -- The tree SHA covers the whole repository content: equal means identical.
-    if not force and state and state.sha == remote.sha and state.ref == ref then
+    -- Leftovers from an older layout still need clearing even when it matches.
+    if not force and not leftovers and state and state.sha == remote.sha and state.ref == ref then
         print("Already up to date.")
         return
     end

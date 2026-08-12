@@ -42,7 +42,8 @@ run("installer.lua")
 
 check(__TEST.files["startup.lua"] ~= nil, "startup.lua installed")
 check(__TEST.files["updater.lua"] ~= nil, "updater.lua left on the computer")
-check(__TEST.files["VERSION"] ~= nil, "VERSION installed")
+check(__TEST.files["baseos.version"] ~= nil, "the version file installed")
+check(__TEST.files["VERSION"] == nil, "the obsolete VERSION file is not installed")
 local installed = state()
 check(installed ~= nil, "an install record was written")
 check(installed and installed.sha ~= nil, "the record stores the remote tree sha")
@@ -67,7 +68,7 @@ run("version.lua")
 print = realPrint
 
 local printed = table.concat(captured, "\n")
-local expected = (remote["VERSION"]:gsub("%s+", ""))
+local expected = (remote["baseos.version"]:gsub("%s+", ""))
 check(printed:find(expected, 1, true) ~= nil, "it prints the installed version (" .. expected .. ")")
 check(printed:find("main", 1, true) ~= nil, "it prints the branch")
 check(printed:find("no install record", 1, true) == nil, "it found the install record")
@@ -84,6 +85,16 @@ run("updater.lua", "-y")
 local calls = __TEST.httpCalls()
 check(calls.raw <= 1, "no files downloaded when the tree sha matches (raw=" .. calls.raw .. ")")
 check(__TEST.files[TARGET] == localEdit, "an unchanged file is left alone")
+
+---------------------------------------------------------- 2.b obsolete files
+-- A file that used to ship (VERSION) shadowed the `version` command on a
+-- case-insensitive filesystem, so the updater has to remove it even when
+-- everything else is already up to date.
+print("[2b] leftovers from an older layout")
+__TEST.files["VERSION"] = "0.1.0\n"
+run("updater.lua", "-y")
+check(__TEST.files["VERSION"] == nil, "an obsolete file is deleted")
+check(__TEST.files["baseos.version"] ~= nil, "the current version file stays")
 
 ---------------------------------------------------------------- 3. check only
 print("[3] a file changes upstream")

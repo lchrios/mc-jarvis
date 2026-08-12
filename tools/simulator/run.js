@@ -21,7 +21,7 @@ function collect(dir, base, out) {
     if (entry.name === '.git' || entry.name === 'node_modules') continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) collect(full, base, out);
-    else if (entry.name.endsWith('.lua') || entry.name === 'VERSION') {
+    else if (entry.name.endsWith('.lua') || entry.name === 'baseos.version') {
       out[path.relative(base, full).split(path.sep).join('/')] = fs.readFileSync(full, 'utf8');
     }
   }
