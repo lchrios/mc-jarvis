@@ -28,16 +28,26 @@ adaptadores por mod y una UI táctil pensada para monitores de CC.
 
 ## Instalación en Minecraft
 
-1. Copia el contenido del repositorio en la raíz del ordenador de CC
-   (`startup.lua` debe quedar en `/startup.lua`). Cualquier método sirve:
-   carpeta del mundo (`saves/<mundo>/computercraft/computer/<id>/`), `wget`, o
-   un disquete.
-2. Coloca un monitor (2x2 o mayor) junto al ordenador, o conéctalo por modem
-   cableado. Si no hay ninguno, BaseOS usa la terminal del ordenador.
-3. Reinicia el ordenador (`reboot`) o ejecuta `startup`.
+Necesitas un **Advanced Computer** y un **Advanced Monitor** (los normales no
+generan eventos táctiles). Con el ordenador abierto:
+
+```
+wget https://raw.githubusercontent.com/lchrios/mc-jarvis/main/installer.lua installer
+installer
+reboot
+```
+
+El instalador descarga el proyecto desde GitHub. Para actualizar más adelante
+basta con volver a ejecutar `installer`: tu `config/` y tu `data/` **no** se
+sobrescriben nunca. Si has renombrado o borrado módulos, `installer main clean`
+limpia `src/` antes de instalar.
+
+Alternativa sin HTTP: copiar el repositorio a
+`saves/<mundo>/computercraft/computer/<id>/` con `startup.lua` en la raíz.
 
 No hace falta configurar nada para el primer arranque: con `config/` vacío
-BaseOS arranca igual usando los valores por defecto.
+BaseOS arranca igual usando los valores por defecto, y sin monitor cae a la
+terminal del ordenador.
 
 ## Qué hay ya funcionando
 

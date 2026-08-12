@@ -16,6 +16,7 @@ npm test                                 # run every scenario
 node run.js                              # dashboard walkthrough on an 82x25 monitor
 node run.js scenarios/resilience.lua     # no monitor + forced alert
 node run.js scenarios/modal.lua          # confirm dialog + log viewer
+node run.js scenarios/installer.lua      # install from a fake GitHub, then boot
 MAX_EVENTS=200 node run.js               # let the scheduler run longer
 SNAPSHOT=3 node run.js                   # print only the third snapshot
 ```

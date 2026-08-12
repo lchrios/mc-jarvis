@@ -383,7 +383,157 @@ textutils.unserialize = textutils.unserialise
 function textutils.serialiseJSON(value) return serialise(value) end
 textutils.serializeJSON = textutils.serialiseJSON
 
+-- A real (small) JSON parser: the installer parses GitHub's API response, so a
+-- fake one would not prove anything.
+local function parseJSON(text)
+    local pos = 1
+
+    local function skipSpace()
+        pos = text:find("[^ \t\r\n]", pos) or (#text + 1)
+    end
+
+    local parseValue
+
+    local function parseString()
+        pos = pos + 1 -- opening quote
+        local out = {}
+        local escapes = { n = "\n", t = "\t", r = "\r", b = "\b", f = "\f",
+                          ['"'] = '"', ["\\"] = "\\", ["/"] = "/" }
+        while true do
+            local char = text:sub(pos, pos)
+            if char == "" then error("unterminated string in JSON") end
+            if char == '"' then
+                pos = pos + 1
+                break
+            elseif char == "\\" then
+                local escape = text:sub(pos + 1, pos + 1)
+                if escapes[escape] then
+                    out[#out + 1] = escapes[escape]
+                    pos = pos + 2
+                elseif escape == "u" then
+                    local code = tonumber(text:sub(pos + 2, pos + 5), 16)
+                    out[#out + 1] = (utf8 and code) and utf8.char(code) or "?"
+                    pos = pos + 6
+                else
+                    error("bad escape in JSON: \\" .. escape)
+                end
+            else
+                out[#out + 1] = char
+                pos = pos + 1
+            end
+        end
+        return table.concat(out)
+    end
+
+    local function parseArray()
+        pos = pos + 1
+        local out = {}
+        skipSpace()
+        if text:sub(pos, pos) == "]" then pos = pos + 1 return out end
+        while true do
+            out[#out + 1] = parseValue()
+            skipSpace()
+            local char = text:sub(pos, pos)
+            pos = pos + 1
+            if char == "]" then return out end
+            if char ~= "," then error("expected , or ] in JSON at " .. pos) end
+            skipSpace()
+        end
+    end
+
+    local function parseObject()
+        pos = pos + 1
+        local out = {}
+        skipSpace()
+        if text:sub(pos, pos) == "}" then pos = pos + 1 return out end
+        while true do
+            skipSpace()
+            local key = parseString()
+            skipSpace()
+            if text:sub(pos, pos) ~= ":" then error("expected : in JSON at " .. pos) end
+            pos = pos + 1
+            out[key] = parseValue()
+            skipSpace()
+            local char = text:sub(pos, pos)
+            pos = pos + 1
+            if char == "}" then return out end
+            if char ~= "," then error("expected , or } in JSON at " .. pos) end
+        end
+    end
+
+    parseValue = function()
+        skipSpace()
+        local char = text:sub(pos, pos)
+        if char == "{" then return parseObject() end
+        if char == "[" then return parseArray() end
+        if char == '"' then return parseString() end
+        if text:sub(pos, pos + 3) == "true" then pos = pos + 4 return true end
+        if text:sub(pos, pos + 4) == "false" then pos = pos + 5 return false end
+        if text:sub(pos, pos + 3) == "null" then pos = pos + 4 return nil end
+        local number = text:match("^%-?%d+%.?%d*[eE]?[%+%-]?%d*", pos)
+        if number then
+            pos = pos + #number
+            return tonumber(number)
+        end
+        error("unexpected character in JSON at " .. pos .. ": " .. char)
+    end
+
+    local ok, value = pcall(parseValue)
+    if not ok then return nil end
+    return value
+end
+
+function textutils.unserialiseJSON(text) return parseJSON(text) end
+textutils.unserializeJSON = textutils.unserialiseJSON
+
 ---------------------------------------------------------------- rednet / shell
+---------------------------------------------------------------- http
+-- Serves a fake GitHub: the git tree API plus raw file downloads. The remote
+-- contents default to the project as it exists on disk.
+local remote = {}
+for path, contents in pairs(files) do remote[path] = contents end
+
+local function jsonEscape(text)
+    return (text:gsub('[%c"\\]', function(char)
+        local map = { ['"'] = '\\"', ["\\"] = "\\\\", ["\n"] = "\\n", ["\r"] = "\\r", ["\t"] = "\\t" }
+        return map[char] or string.format("\\u%04x", char:byte())
+    end))
+end
+
+local function treeResponse()
+    local entries = {}
+    local seenDirs = {}
+    for path in pairs(remote) do
+        local dir = path:match("^(.*)/[^/]*$")
+        if dir and not seenDirs[dir] then
+            seenDirs[dir] = true
+            entries[#entries + 1] = ('{"path":"%s","type":"tree"}'):format(jsonEscape(dir))
+        end
+        entries[#entries + 1] =
+            ('{"path":"%s","type":"blob","size":%d}'):format(jsonEscape(path), #remote[path])
+    end
+    return '{"sha":"deadbeef","truncated":false,"tree":[' .. table.concat(entries, ",") .. "]}"
+end
+
+http = {}
+function http.get(url)
+    local body
+    if url:find("api.github.com", 1, true) and url:find("/git/trees/", 1, true) then
+        body = treeResponse()
+    else
+        local path = url:match("raw%.githubusercontent%.com/[^/]+/[^/]+/[^/]+/(.+)$")
+        body = path and remote[path]
+    end
+
+    if not body then return nil, "404 Not Found" end
+    return {
+        readAll = function() return body end,
+        getResponseCode = function() return 200 end,
+        close = function() end,
+    }
+end
+http.checkURL = function() return true end
+
 rednet = {
     isOpen = function() return false end,
     open = function() error("no modem") end,
@@ -418,4 +568,15 @@ __TEST = {
         queue[#queue + 1] = { "peripheral_detach", name }
     end,
     queueEventAt = function(index, ...) injections[index] = { ... } end,
+    --- What the fake GitHub serves (defaults to the project on disk).
+    remote = function() return remote end,
+    --- Empty the computer's filesystem, keeping the listed paths.
+    wipeDisk = function(keep)
+        local kept = {}
+        for _, path in ipairs(keep or {}) do kept[path] = true end
+        for path in pairs(files) do
+            if not kept[path] then files[path] = nil end
+        end
+        for dir in pairs(dirs) do dirs[dir] = nil end
+    end,
 }
