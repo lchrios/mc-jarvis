@@ -1,0 +1,12 @@
+{
+  "name": "baseos-simulator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Runs BaseOS outside Minecraft under a real Lua VM with a mocked CC:Tweaked API",
+  "scripts": {
+    "test": "node run.js scenarios/dashboard.lua && node run.js scenarios/resilience.lua"
+  },
+  "dependencies": {
+    "wasmoon": "^1.16.0"
+  }
+}

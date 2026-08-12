@@ -1,0 +1,10 @@
+# Runtime data written by BaseOS on the computer
+data/*
+!data/.gitkeep
+
+# Simulator (development only)
+node_modules/
+package-lock.json
+
+# Local editor / tooling settings
+.claude/settings.local.json
