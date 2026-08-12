@@ -238,6 +238,8 @@ plano, no solo en su tile.
 
 ## Documentación
 
+* [docs/HARDWARE.md](docs/HARDWARE.md) — qué bloques montar y cómo cablearlos,
+  por etapas, con la configuración de cada una.
 * [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — estructura, flujo de eventos,
   UI, adapters, peripheral manager, red.
 * [docs/MODULE_DEVELOPMENT.md](docs/MODULE_DEVELOPMENT.md) — cómo añadir un
