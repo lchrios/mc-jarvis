@@ -28,6 +28,7 @@ node run.js scenarios/presence.lua       # proximity triggers + alert announceme
 node run.js scenarios/security.lua       # roles, badge-in sessions, enrolment
 node run.js scenarios/backup.lua         # destroy a computer and rebuild it
 node run.js scenarios/rescan.lua         # peripherals appearing and vanishing silently
+node run.js scenarios/notifications.lua  # what reaches the Chat Box, and what does not
 node run.js scenarios/rules.lua          # automation, both exit paths
 node run.js scenarios/rule_editor.lua    # edit a rule on screen, engine picks it up
 node run.js scenarios/resilience.lua     # no monitor + forced alert

@@ -29,6 +29,7 @@ config/                  Configuración (sin código de lógica)
   layout.lua             Mapa/plano de la base (zonas del dashboard)
   security.lua           Perfiles de permisos (desactivado por defecto)
   rules.lua              Automatizaciones
+  notifications.lua      Qué se anuncia por el chat
   modules.lua            Módulos activos y sus ajustes
   network.lua            Rednet (desactivado por defecto)
   theme.lua              Colores y caracteres de dibujo
@@ -62,7 +63,7 @@ src/
     storage.lua          Almacenamiento (red o inventarios)
     demo_farm.lua        Granja simulada para validar la UI
     presence.lua         Detección de jugadores y activación por proximidad
-    notifier.lua         Alertas al chat y al altavoz
+    notifier.lua         Transporte de avisos: chat box y altavoz
     farm.lua             Plantilla de granja real (instancias por config)
     remote.lua           Proxy de un módulo que corre en otro ordenador
   ui/
@@ -76,7 +77,7 @@ src/
     components/          label, button, panel, progress_bar, list, modal,
                          pager, zone_tile
     screens/             dashboard, base_map, layout_editor, security,
-                         rules_list, rule_edit, chooser,
+                         rules_list, rule_edit, chooser, notifications,
                          name_entry, module_detail,
                          metric_detail,
                          module_list, alerts, peripherals, logs, nodes,
@@ -89,6 +90,7 @@ src/
     activity.lua         Eventos recientes para el feed del dashboard
     backup.lua           Archivo de configuración: disco, local y remoto
     rules.lua            Motor de automatizaciones
+    notifications.lua    Catálogo de avisos (qué se dice, no cómo)
     security.lua         Perfiles y permisos por acción
     layout_store.lua     Plano vigente: override de data/ o config/layout.lua
     alerts.lua           Alertas activas con severidad
@@ -426,7 +428,29 @@ muestran el patrón (levantar al 90%, limpiar al 80%).
 
 ---
 
-## 10.a Reglas
+## 10.a Avisos
+
+Dos piezas, a propósito separadas:
+
+* `services/notifications.lua` — el **catálogo**: qué merece la pena decir. Cada
+  tema nombra un evento real del bus y una función que convierte su payload en
+  una línea. Si el tema está encendido y la función devuelve texto, emite un
+  `notify` normalizado.
+* `modules/notifier.lua` — el **transporte**: qué hay conectado (Chat Box,
+  altavoz), el límite de ritmo y el envío.
+
+Así, un ordenador sin Chat Box sigue emitiendo `notify` y no se rompe nada:
+simplemente no lo escucha nadie. Y añadir una vía nueva (un correo por rednet al
+master, por ejemplo) es suscribirse a `notify`, sin tocar el catálogo.
+
+Un tema devuelve `nil` para callarse ante un payload concreto: así `module_error`
+escucha *todos* los cambios de estado y solo habla de los que son errores, en vez
+de necesitar un evento propio.
+
+Precedencia, igual que en reglas y en el plano: `data/notifications.dat` (la
+pantalla) → `config/notifications.lua` → el `default` del catálogo.
+
+## 10.a bis Reglas
 
 `services/rules.lua` es una máquina de dos estados por regla, no un temporizador:
 entra con `when`, sale con `until_` **o** con `after`, lo que ocurra primero. No

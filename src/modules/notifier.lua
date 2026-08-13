@@ -14,6 +14,7 @@
 -- missing or a future version can rename things.
 
 local util = require("core.util")
+local notifications = require("services.notifications")
 
 local notifier = {}
 
@@ -140,8 +141,20 @@ function notifier.setup(self, ctx)
     self.sent, self.failed, self.suppressed = 0, 0, 0
     self.sinks = findSinks(self)
 
+    -- Everything the catalogue decided is worth saying. The service does the
+    -- choosing and the wording; this end only knows how to reach the player.
+    ctx.bus.on("notify", function(payload)
+        if not self.settings.enabled then return end
+        if not allowed(self, { id = "topic:" .. tostring(payload.topic) }) then return end
+
+        self.lastSent["topic:" .. tostring(payload.topic)] = util.nowMs()
+        self.recent[#self.recent + 1] = util.nowMs()
+        notifier.broadcast(self, payload.message, payload.severity)
+    end, { owner = "module:notifier" })
+
     ctx.bus.on("alert.raised", function(alert)
         if not self.settings.enabled then return end
+        if not notifications.enabled("alerts") then return end
         if rank(alert.severity) < rank(self.settings.minSeverity) then return end
         if not allowed(self, alert) then return end
 
@@ -154,6 +167,7 @@ function notifier.setup(self, ctx)
 
     ctx.bus.on("alert.cleared", function(alert)
         if not self.settings.enabled or not self.settings.chat.announceClears then return end
+        if not notifications.enabled("alerts") then return end
         -- Only worth saying when the raise was announced in the first place.
         if not self.announcedRaise[alert.id] then return end
         self.announcedRaise[alert.id] = nil
@@ -177,7 +191,13 @@ function notifier.status(self)
 end
 
 function notifier.metrics(self)
+    local on = 0
+    for _, topic in ipairs(notifications.list()) do
+        if topic.enabled then on = on + 1 end
+    end
+
     return {
+        { id = "topics", label = "Topics on", value = on },
         { id = "chat", label = "Chat boxes", value = #self.sinks.chat },
         { id = "speakers", label = "Speakers", value = #self.sinks.speaker },
         { id = "sent", label = "Announced", value = self.sent or 0 },

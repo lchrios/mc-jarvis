@@ -28,6 +28,7 @@ local history = require("services.history")
 local activity = require("services.activity")
 local security = require("services.security")
 local rules = require("services.rules")
+local notifications = require("services.notifications")
 
 local theme = require("ui.theme")
 local Renderer = require("ui.renderer")
@@ -98,6 +99,9 @@ local function registerScreens()
     end)
     navigation.register("peripherals", function(params)
         return require("ui.screens.peripherals").new(params)
+    end)
+    navigation.register("notifications", function(params)
+        return require("ui.screens.notifications").new(params)
     end)
     navigation.register("logs", function(params)
         return require("ui.screens.logs").new(params)
@@ -372,6 +376,9 @@ function app.boot(options)
     history.start(context, config.get("system.history", {}))
     activity.start(context)
     security.start(context)
+    -- Before the modules poll, so the first thing that happens can already be
+    -- announced. The notifier module is what turns these into chat.
+    notifications.start(context)
     rules.start(context, config.section("rules"))
 
     -- 10. UI wiring + first paint

@@ -264,6 +264,53 @@ toca nunca** — igual que el plano del editor. `RESET` borra el override y el
 fichero vuelve a mandar. El motor recoge los cambios al momento: no hace falta
 reiniciar el ordenador para que una regla recién encendida empiece a actuar.
 
+## Avisos por chat
+
+El Chat Box es la única parte de BaseOS que te encuentra a ti en vez de esperar
+a que mires el monitor. Por eso lo que dice tiene que ser lo que tú quieres oír:
+el módulo `notifier` sabe **cómo** llegarte (Chat Box, altavoz, límite de
+ritmo), y el catálogo decide **qué** merece la pena decir.
+
+Pantalla `ALERTS` → botón **NOTIFY**. Una fila por tema, y a la derecha lo que
+lleva hecho:
+
+```
+ Alerts                                                          4 said
+ Player arrives                                                  2 said
+ Node goes silent                                                    on
+ Module fails                                                        on
+ Farm starts or stops                                               off
+ Access denied                                                   1/3 said
+```
+
+`1/3 said` significa que pasó tres veces y solo una llegó al chat: el resto lo
+frenó el límite de ritmo. `ANNOUNCE` / `MUTE` enciende o apaga el seleccionado,
+`TEST` manda una línea de prueba por el camino real, y `RESET` vuelve al fichero.
+
+Los 17 temas, y cómo vienen de fábrica:
+
+| Encendidos | Apagados |
+| --- | --- |
+| Alertas (avisos y críticos) | Un jugador se va de una zona |
+| **Un jugador entra en una zona** | Se pierde un peer de rednet |
+| **Un nodo deja de reportar** | Un módulo se recupera |
+| Un módulo se cae | Aparece o desaparece un periférico |
+| Lo que una regla quiere decir (`say`) | Una regla entra, sale o cede |
+| Alguien intentó algo sin permiso | Una granja arranca o para |
+| Alguien recibió acceso al panel | Alguien se identifica en el detector |
+
+Cada tema escucha un evento **real** de BaseOS; no hay ninguno inventado. Los
+apagados no es que sean inútiles: es que hablan mucho, y una base que narra cada
+periférico que redescubre es una base que nadie lee.
+
+Lo que enciendas en la pantalla se guarda en `data/notifications.dat` y manda
+sobre [config/notifications.lua](config/notifications.lua), que no se toca
+nunca. El cambio es inmediato, sin reiniciar.
+
+> Un detalle que esto arregla de paso: la acción `say` de una regla, que estaba
+> documentada desde el principio, **no tenía a nadie escuchando**. Ahora sale por
+> el chat como el tema `rule_message`.
+
 ## Copias de seguridad
 
 `updater` devuelve los programas; lo que no se puede volver a descargar es lo
@@ -321,8 +368,9 @@ la config por defecto.
 * Servicio de alertas con severidades y capa de red rednet lista pero apagada.
 * Módulo `presence`: puertas y mecanismos que se encienden al acercarse un
   jugador, con radio, filtro por jugador, retardo de cierre y control manual.
-* Módulo `notifier`: manda las alertas al Chat Box y al altavoz, con límite de
-  ritmo para que una alerta que oscila no inunde el chat.
+* Módulo `notifier` + catálogo de avisos: 17 cosas que pasan en la base, cada
+  una se enciende o se apaga desde la pantalla, con límite de ritmo para que
+  nada inunde el chat.
 * Motor de reglas con salida por condición **o** por tiempo, set base de siete
   reglas apagadas y editor en pantalla para encenderlas y ajustarlas sin tocar
   ficheros.

@@ -20,7 +20,7 @@ local config = {}
 
 --- Files loaded from /config, in merge order.
 config.FILES = { "system", "peripherals", "layout", "modules", "network", "theme",
-    "security", "rules" }
+    "security", "rules", "notifications" }
 
 --- Built-in defaults. Anything referenced by the core must have a default here
 --- so BaseOS still boots on a computer with an empty /config directory.

@@ -20,6 +20,11 @@ Los monitores **normales no generan eventos táctiles**: con uno de esos la UI s
 dibuja pero no responde. Un nodo, en cambio, no necesita gastar oro: un Computer
 normal vale.
 
+**Chat Box** (Advanced Peripherals) opcional, pegado con modem al equipo que
+quieras que hable — normalmente el master. Sin él no se rompe nada: los avisos
+se siguen generando, simplemente no los escucha nadie. Qué se anuncia se elige
+en `ALERTS` → `NOTIFY`.
+
 ---
 
 ## Etapa 1 — Un solo ordenador
