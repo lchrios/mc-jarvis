@@ -49,9 +49,9 @@ src/
     energy.lua           Almacenamiento de energía genérico
     fluid.lua            Tanques genéricos
     speaker.lua          Altavoz (CC vanilla, verificado)
-    ae2.lua              ME Bridge / RS Bridge (sin verificar en juego)
+    ae2.lua              ME Bridge / RS Bridge (verificado contra AP 0.7.62b)
     powah.lua            Powah (extras sobre energy, sin verificar)
-    advanced_peripherals.lua  Player/Environment Detector, Chat Box, etc.
+    advanced_peripherals.lua  Player Detector, Chat Box... (verificado)
   modules/
     registry.lua         Registro, ciclo de vida y snapshots de módulos
     system.lua           Info del ordenador (módulo de referencia)

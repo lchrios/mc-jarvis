@@ -226,7 +226,8 @@ Para un módulo que corre en un nodo, el id lleva el nombre del nodo delante:
 | `MONITOR TOO SMALL` | El monitor es menor de 3x2 |
 | La UI no responde al tacto | El monitor es normal, no Advanced |
 | Un periférico no aparece | `scan`; ¿está activado su modem con click derecho? |
-| Aparece pero no se lee | `scan <nombre>` y pásame los métodos |
+| Aparece pero no se lee | `probe` para ver qué métodos responden |
+| Un aparato de Advanced Peripherals no encaja | `probe <nombre>`; los tipos son snake_case (`player_detector`) |
 | El nodo no llega al master | `network:` en su terminal; ¿modem en los dos equipos? |
 | Un equipo quedó mal configurado | `setup` para cambiar el rol, `reset` para dejarlo limpio |
 

@@ -165,7 +165,8 @@ la config por defecto.
   cofre de salida, mide items/min, avisa cuando el buffer se llena y arranca o
   para la granja por redstone o Redstone Integrator.
 * Adaptadores genéricos (inventarios, energía, fluidos) y esqueletos para AE2,
-  Powah y Advanced Peripherals, todos con detección de capacidades.
+  Powah y Advanced Peripherals. Los de AP y los bridges están verificados contra
+  los `@LuaFunction` del jar de AdvancedPeripherals 0.7.62b.
 * Servicio de alertas con severidades y capa de red rednet lista pero apagada.
 * Módulo `presence`: puertas y mecanismos que se encienden al acercarse un
   jugador, con radio, filtro por jugador, retardo de cierre y control manual.

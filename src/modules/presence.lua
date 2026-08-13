@@ -15,9 +15,10 @@
 -- Each zone can be forced ON or OFF from the detail screen; AUTO gives it back
 -- to the detector.
 --
--- STATUS: the Player Detector method names come from Advanced Peripherals and
--- have not been confirmed in game. The adapter probes several candidates, and
--- this module reports `NO DETECTOR` rather than quietly leaving doors shut.
+-- Verified against Advanced Peripherals 0.7.62b. Two things worth knowing:
+-- the peripheral type is `player_detector` (snake_case), and that version ships
+-- no Redstone Integrator - `kind = "integrator"` therefore matches anything
+-- exposing `setOutput`, whichever mod provides it.
 
 local util = require("core.util")
 
@@ -30,7 +31,7 @@ presence.description = "Player detection and proximity triggers"
 presence.pollInterval = 1
 
 presence.peripherals = {
-    { alias = "playerDetector", type = "playerDetector", optional = true },
+    { alias = "playerDetector", type = "player_detector", optional = true },
 }
 
 local DEFAULTS = {
@@ -55,9 +56,13 @@ local function writeOutput(self, zone, on)
     local signal = output.invert and (not on) or on
 
     if output.kind == "integrator" then
+        -- By capability, not by type: AP 0.7.62b has no Redstone Integrator,
+        -- so accept whatever peripheral can actually drive redstone.
         local integrator = self.ctx.peripherals.get(presence.id .. "." .. zone.id .. ".output")
-            or self.ctx.peripherals.firstOfType("redstoneIntegrator")
-        if not integrator then return false, "redstone integrator not connected" end
+        if not integrator then
+            integrator = self.ctx.peripherals.findByMethod("setOutput")[1]
+        end
+        if not integrator then return false, "no peripheral with setOutput attached" end
         local _, err = integrator.call("setOutput", output.side or "top", signal)
         return err == nil, err
     end
@@ -169,7 +174,7 @@ end
 
 function presence.poll(self)
     local proxy = self.ctx.peripherals.get("playerDetector")
-        or self.ctx.peripherals.firstOfType("playerDetector")
+        or self.ctx.peripherals.firstOfType("player_detector")
     self.detector = proxy and self.ctx.adapters.forProxy(proxy, "advanced_peripherals") or nil
 
     if not self.detector then

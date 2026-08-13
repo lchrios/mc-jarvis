@@ -8,9 +8,10 @@
 -- must not turn chat into a wall of text: each alert id has a cooldown, and
 -- there is a ceiling per minute across all of them.
 --
--- STATUS: the Chat Box side depends on Advanced Peripherals method names that
--- have not been confirmed in game. `probe` reports what actually answers, and
--- this module says NO SINKS rather than pretending it delivered anything.
+-- Verified against Advanced Peripherals 0.7.62b: the Chat Box type is
+-- `chat_box` and the method is `sendMessage`. It still says NO SINKS rather
+-- than pretending it delivered anything, because a device can always be
+-- missing or a future version can rename things.
 
 local util = require("core.util")
 
@@ -58,7 +59,7 @@ local function findSinks(self)
     local ctx = self.ctx
     local sinks = { chat = {}, speaker = {} }
 
-    for _, proxy in ipairs(ctx.peripherals.findByType("chatBox")) do
+    for _, proxy in ipairs(ctx.peripherals.findByType("chat_box")) do
         local wrapped = ctx.adapters.forProxy(proxy, "advanced_peripherals")
         if wrapped and wrapped.say then sinks.chat[#sinks.chat + 1] = wrapped end
     end

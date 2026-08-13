@@ -25,13 +25,15 @@ return {
         -- Uncomment as the base grows. Everything is optional: a missing
         -- peripheral marks its module unavailable, it never breaks the boot.
 
+        -- Los tipos de Advanced Peripherals son snake_case (verificado contra
+        -- 0.7.62b): "player_detector", no "playerDetector".
         -- mainMonitor      = { name = "monitor_3" },
-        -- meBridge         = { type = "meBridge", optional = true },
-        -- rsBridge         = { type = "rsBridge", optional = true },
-        -- chatBox          = { type = "chatBox", optional = true },
-        -- playerDetector   = { type = "playerDetector", optional = true },
-        -- environment      = { type = "environmentDetector", optional = true },
-        -- energyDetector   = { type = "energyDetector", optional = true },
+        -- meBridge         = { type = "me_bridge", optional = true },
+        -- rsBridge         = { type = "rs_bridge", optional = true },
+        -- chatBox          = { type = "chat_box", optional = true },
+        -- playerDetector   = { type = "player_detector", optional = true },
+        -- environment      = { type = "environment_detector", optional = true },
+        -- energyDetector   = { type = "energy_detector", optional = true },
         -- alarmSpeaker     = { type = "speaker", optional = true },
         -- mainEnergyCell   = { type = "powah:energy_cell_nitro", optional = true },
         -- farmOutput       = { name = "minecraft:barrel_2", optional = true },

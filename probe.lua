@@ -5,54 +5,72 @@
 --   probe <name>           only that peripheral
 --
 -- `scan` lists what methods exist; this one calls them and shows the result,
--- which is the difference between "the method is there" and "it works". BaseOS
--- guesses AP method names from candidate lists because they change between
--- versions - this is how you find out which guess was right.
+-- which is the difference between "the method is there" and "it works". The
+-- lists below were read out of the mod jar, so a miss here means your version
+-- differs from 0.7.62b - which is exactly what this is for.
 --
 -- Only read-only methods run unless you ask for `chat`.
 
+-- Read-only methods, taken from the @LuaFunction annotations in
+-- AdvancedPeripherals-1.21.1-0.7.62b. Type ids are snake_case in that version.
 local READ_ONLY = {
-    playerDetector = {
+    player_detector = {
         { "getOnlinePlayers", {}, "players on the server" },
         { "getPlayersInRange", { 16 }, "players within 16 blocks" },
     },
-    environmentDetector = {
+    environment_detector = {
         { "getBiome", {}, "biome" },
+        { "getDimension", {}, "dimension" },
         { "getTime", {}, "world time" },
-        { "getDay", {}, "day" },
         { "isRaining", {}, "raining" },
         { "isThunder", {}, "thunder" },
+        { "isSunny", {}, "sunny" },
         { "getMoonName", {}, "moon phase" },
-        { "getDimensionName", {}, "dimension" },
-        { "getRadiation", {}, "radiation" },
+        { "getSkyLightLevel", {}, "sky light" },
+        { "isSlimeChunk", {}, "slime chunk" },
     },
-    energyDetector = {
+    energy_detector = {
         { "getTransferRate", {}, "FE/t through this block" },
         { "getTransferRateLimit", {}, "configured limit" },
     },
-    inventoryManager = {
+    inventory_manager = {
         { "getOwner", {}, "bound player" },
         { "isPlayerEquipped", {}, "player online and equipped" },
+        { "getEmptySpace", {}, "free slots" },
     },
-    blockReader = {
+    block_reader = {
         { "getBlockName", {}, "block in front" },
+        { "isTileEntity", {}, "has a block entity" },
     },
-    geoScanner = {
+    geo_scanner = {
         { "getFuelLevel", {}, "fuel" },
-        { "getScanCooldown", {}, "cooldown" },
+        { "cost", { 8 }, "fuel a radius-8 scan would cost" },
     },
-    redstoneIntegrator = {
-        { "getOutput", { "top" }, "output on top" },
-        { "getInput", { "top" }, "input on top" },
-    },
-    meBridge = {
-        { "getEnergyStorage", {}, "network energy" },
+    me_bridge = {
+        { "isConnected", {}, "wired into a network" },
+        { "getStoredEnergy", {}, "network energy" },
         { "getEnergyUsage", {}, "network draw" },
+        { "getTotalItemStorage", {}, "bytes of item storage" },
+        { "getUsedItemStorage", {}, "bytes used" },
     },
-    rsBridge = {
-        { "getEnergyStorage", {}, "network energy" },
+    rs_bridge = {
+        { "isConnected", {}, "wired into a network" },
+        { "getStoredEnergy", {}, "network energy" },
+        { "getTotalItemStorage", {}, "bytes of item storage" },
     },
-    chatBox = {},   -- writing only; never exercised without being asked
+    nbt_storage = {
+        { "read", {}, "stored table" },
+    },
+    chat_box = {},   -- writing only; never exercised without being asked
+}
+
+--- camelCase spellings from older versions, so an odd pack still reports.
+local LEGACY = {
+    playerDetector = "player_detector", environmentDetector = "environment_detector",
+    energyDetector = "energy_detector", inventoryManager = "inventory_manager",
+    blockReader = "block_reader", geoScanner = "geo_scanner",
+    meBridge = "me_bridge", rsBridge = "rs_bridge",
+    nbtStorage = "nbt_storage", chatBox = "chat_box",
 }
 
 local AP_TYPES = {}
@@ -68,6 +86,7 @@ end
 local function apKind(name)
     for _, kind in ipairs(typesOf(name)) do
         if AP_TYPES[kind] then return kind end
+        if LEGACY[kind] then return LEGACY[kind] end
     end
     return nil
 end
@@ -131,7 +150,7 @@ local function probeOne(name)
     local checks = READ_ONLY[kind] or {}
     if #checks == 0 then
         print("  nothing safe to read; this device only writes.")
-        if kind == "chatBox" then
+        if kind == "chat_box" then
             print("  try:  probe chat \"hola\"")
         end
         return
@@ -158,7 +177,7 @@ end
 local function probeChat(message)
     local boxes = {}
     for _, name in ipairs(peripheral.getNames()) do
-        if apKind(name) == "chatBox" then boxes[#boxes + 1] = name end
+        if apKind(name) == "chat_box" then boxes[#boxes + 1] = name end
     end
 
     if #boxes == 0 then
@@ -173,7 +192,7 @@ local function probeChat(message)
         local methods = methodSet(name)
         local sent = false
 
-        for _, method in ipairs({ "sendMessage", "say" }) do
+        for _, method in ipairs({ "sendMessage" }) do
             if methods[method] and not sent then
                 local ok, err = pcall(peripheral.call, name, method, message, "BaseOS")
                 if ok then

@@ -828,10 +828,11 @@ __TEST = {
 
     --- Attach an Advanced Peripherals device by type.
     addAdvancedPeripheral = function(kind, name)
+        -- snake_case, as Advanced Peripherals 0.7.62b actually reports them.
         local factories = {
-            playerDetector = makePlayerDetector,
-            chatBox = makeChatBox,
-            redstoneIntegrator = makeRedstoneIntegrator,
+            player_detector = makePlayerDetector,
+            chat_box = makeChatBox,
+            redstone_integrator = makeRedstoneIntegrator,
         }
         local factory = factories[kind]
         if not factory then error("no mock for " .. tostring(kind), 2) end

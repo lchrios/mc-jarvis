@@ -18,8 +18,8 @@ local function check(condition, message)
     return false
 end
 
-__TEST.addAdvancedPeripheral("playerDetector")
-__TEST.addAdvancedPeripheral("chatBox")
+__TEST.addAdvancedPeripheral("player_detector")
+__TEST.addAdvancedPeripheral("chat_box")
 __TEST.addSpeaker()
 
 __TEST.files["config/modules.lua"] = [[
