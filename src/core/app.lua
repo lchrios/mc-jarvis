@@ -271,10 +271,16 @@ function app.boot(options)
         bootTime = bootTime,
     })
 
-    -- 4. Peripherals
+    -- 4. Peripherals. What this computer watches for depends on what it is: a
+    -- power node lives off its peripherals, a display has nothing to discover.
+    local rescanSettings = util.deepMerge(
+        config.get("peripherals.rescan", {}),
+        config.get("peripherals.byRole." .. tostring(me.profile or me.role) .. ".rescan", {}))
+
     peripheralManager.init({
         aliases = config.get("peripherals.aliases", {}),
-        rescanInterval = config.get("peripherals.rescanInterval", 30),
+        rescan = rescanSettings,
+        rescanInterval = config.get("peripherals.rescanInterval", nil),
         scheduler = scheduler,
     })
 

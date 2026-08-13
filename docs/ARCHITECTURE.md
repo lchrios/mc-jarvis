@@ -229,6 +229,38 @@ Arrancar un periférico de la pared no rompe nada: el alias queda sin ligar, se
 emite `peripheral.alias_lost` y los módulos que lo requieren pasan a
 `unavailable`.
 
+### Redescubrimiento
+
+Los eventos `peripheral` / `peripheral_detach` cubren lo que el juego avisa. El
+repaso periódico existe para lo que **no** avisa: un chunk que se descarga se
+lleva el bloque sin decir nada, y un modem roto por un creeper tampoco siempre
+lo cuenta.
+
+| Disparador | Qué hace |
+| --- | --- |
+| Arranque | Repaso completo, con relectura de tipos y métodos |
+| Evento attach/detach | Alta o baja inmediata de ese periférico |
+| Temporizador | Repaso cada `interval`, o cada `degradedInterval` si falta algo |
+| Cada `deepEvery` repasos | Además relee tipos y métodos de lo ya conocido |
+| Una llamada que falla | Si el periférico ya no está, se da de baja al momento |
+| Botón `RESCAN NOW` | Repaso profundo ahora, en la pantalla DEVICES |
+
+Tres cosas que hace el repaso y no hacen los eventos:
+
+* **Comprueba presencia**, no solo enumera. Un nombre que sigue en
+  `peripheral.getNames()` pero cuyo `isPresent` dice que no está se da de baja.
+* **Relee la identidad**. Si rompes una celda y pones otra más grande en el
+  mismo sitio, el nombre puede repetirse; comparando tipos y métodos se detecta
+  y se emite `peripheral.changed`.
+* **Publica altas y bajas al bus** igual que un evento del juego, así que los
+  módulos y la UI reaccionan sin distinguir de dónde vino la noticia.
+
+**La cadencia se adapta.** Mientras algún alias no opcional esté sin ligar, el
+equipo está *degraded* y mira cada pocos segundos; cuando todo está en su sitio,
+espacia el repaso. Y cada equipo tiene lo suyo: `byRole` en
+`config/peripherals.lua` afina el intervalo por perfil, porque un nodo de
+energía vive de sus periféricos y una pantalla no tiene nada que descubrir.
+
 ---
 
 ## 7. Capa de adapters

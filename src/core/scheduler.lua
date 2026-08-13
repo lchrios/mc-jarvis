@@ -160,7 +160,17 @@ function scheduler.onTimer(timerId)
     for _, task in pairs(tasks) do
         if not task.paused and task.nextAt <= now then due[#due + 1] = task end
     end
-    table.sort(due, function(a, b) return a.nextAt < b.nextAt end)
+
+    -- Tasks registered at boot are almost all due at the same instant, and
+    -- `pairs` does not promise an order. Without the id as a tiebreaker, which
+    -- of two tasks due together runs first changes from one boot to the next -
+    -- so a rule could read a metric before or after its module refreshed it,
+    -- and the same base would behave differently on Tuesday. The id is the
+    -- registration counter, so boot order decides, every time.
+    table.sort(due, function(a, b)
+        if a.nextAt ~= b.nextAt then return a.nextAt < b.nextAt end
+        return a.id < b.id
+    end)
 
     for _, task in ipairs(due) do
         if tasks[task.id] then

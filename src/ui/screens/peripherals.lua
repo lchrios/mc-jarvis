@@ -11,6 +11,7 @@ local bus = require("core.event_bus")
 local Screen = require("ui.screen")
 local List = require("ui.components.list")
 local Label = require("ui.components.label")
+local Button = require("ui.components.button")
 local manager = require("peripherals.manager")
 local theme = require("ui.theme")
 
@@ -42,6 +43,7 @@ function PeripheralsScreen:onMount()
     local refresh = function() self:requestLayout() end
     self:onCleanup(bus.on("peripheral.attached", refresh, { owner = "screen:peripherals" }))
     self:onCleanup(bus.on("peripheral.detached", refresh, { owner = "screen:peripherals" }))
+    self:onCleanup(bus.on("peripheral.changed", refresh, { owner = "screen:peripherals" }))
 end
 
 ---------------------------------------------------------------------------
@@ -135,15 +137,41 @@ function PeripheralsScreen:buildRows()
     return rows
 end
 
+--- How long ago the last scan was, in words.
+local function sinceScan(stats)
+    if not stats.lastScanAt or stats.lastScanAt == 0 then return "never" end
+    local seconds = math.floor((util.nowMs() - stats.lastScanAt) / 1000)
+    if seconds < 2 then return "just now" end
+    if seconds < 60 then return seconds .. "s ago" end
+    return math.floor(seconds / 60) .. "m ago"
+end
+
+function PeripheralsScreen:rescan()
+    manager.rescan("from the panel")
+    self.message = "Rescanned: " .. manager.count() .. " device(s)."
+    self:requestLayout()
+end
+
 function PeripheralsScreen:onLayout(x, y, w, h)
     local width = w - 2
+    local stats = manager.stats()
 
+    -- The line says whether it is looking after itself, so "nothing appeared"
+    -- can be told apart from "nothing has looked".
     local header = Label.new({
-        text = tostring(manager.count()) .. " device(s) - touch one to expand",
-        fg = "textDim",
+        text = util.truncate(self.message or
+            ("%d device(s)  -  scan #%d %s, every %ds%s"):format(
+                stats.count, stats.scans, sinceScan(stats), stats.interval,
+                stats.degraded and ("  -  MISSING " .. table.concat(stats.missing, ", ")) or ""),
+            width),
+        fg = stats.degraded and "statusWarn" or "textDim",
     })
     header:setBounds(x + 1, y, width, 1)
     self:add(header)
+    self.message = nil
+
+    local BUTTON_HEIGHT = 3
+    local listHeight = math.max(1, h - 1 - BUTTON_HEIGHT)
 
     self.list = List.new({
         items = self:buildRows(),
@@ -158,8 +186,19 @@ function PeripheralsScreen:onLayout(x, y, w, h)
             end
         end,
     })
-    self.list:setBounds(x + 1, y + 1, width, math.max(1, h - 1))
+    self.list:setBounds(x + 1, y + 1, width, listHeight)
     self:add(self.list)
+
+    -- The rescan is automatic; the button is for when you just placed a modem
+    -- and do not want to wait for the next pass.
+    local button = Button.new({
+        label = "RESCAN NOW",
+        style = "primary",
+        bracket = false,
+        onPress = function() self:rescan() end,
+    })
+    button:setBounds(x + 1, y + h - BUTTON_HEIGHT, width, BUTTON_HEIGHT)
+    self:add(button)
 end
 
 function PeripheralsScreen:update()

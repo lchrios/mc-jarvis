@@ -73,7 +73,14 @@ local DEFAULTS = {
         aliases = {
             mainMonitor = { type = "monitor", optional = true },
         },
-        rescanInterval = 30,
+        -- How often the network is walked again looking for what the attach
+        -- and detach events did not report. See config/peripherals.lua.
+        rescan = {
+            interval = 30,
+            degradedInterval = 5,
+            deepEvery = 4,
+            minGap = 1,
+        },
     },
 
     layout = {

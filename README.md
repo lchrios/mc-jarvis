@@ -366,6 +366,40 @@ sistema abre su detalle, y la barra inferior lleva a las pantallas que se usan a
 diario. En monitores estrechos el feed de actividad se retira antes que nada
 esencial.
 
+### Dispositivos, y cómo se encuentran solos
+
+Botón `DEVICES`: un árbol con todo lo que ve este equipo. Cada fila se despliega
+y dice qué tipos reporta, cuántos métodos tiene, qué alias lo reclamó y qué sabe
+leer BaseOS de él — o, si no sabe leer nada, te lo dice para que corras
+`scan <nombre>`.
+
+**No hay que reiniciar para que aparezca un bloque nuevo.** Conectar o
+desconectar llega como evento y se atiende al instante; lo demás lo recoge el
+repaso periódico:
+
+| Pasa esto | Se detecta así |
+| --- | --- |
+| Activas el modem de un bloque | En el siguiente repaso, segundos |
+| Se descarga el chunk de una máquina | Se comprueba presencia, no solo el listado |
+| Rompes una celda y pones otra mayor | Se releen tipos y métodos: mismo nombre, otro bloque |
+| Una máquina deja de responder | La primera llamada que falla la da de baja |
+| Acabas de poner algo y no esperas | Botón `RESCAN NOW` |
+
+**La cadencia se adapta al equipo.** Mientras falte algo que este ordenador
+espera, mira cada pocos segundos y la cabecera lo dice (`MISSING mainCell`);
+cuando está todo, espacia el repaso. Y cada nodo vigila lo suyo: en
+[config/peripherals.lua](config/peripherals.lua), `byRole` afina el intervalo
+por perfil — un nodo de energía vive de sus periféricos, una pantalla no tiene
+nada que descubrir.
+
+```lua
+rescan = { interval = 30, degradedInterval = 5, deepEvery = 4, minGap = 1 },
+byRole = {
+    power   = { rescan = { interval = 15, degradedInterval = 3 } },
+    display = { rescan = { interval = 120, degradedInterval = 15 } },
+},
+```
+
 ### El mapa de la base
 
 El plano vive en su **propia pantalla** (botón `MAP`, o como vista fija de un

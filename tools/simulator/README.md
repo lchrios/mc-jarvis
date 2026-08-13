@@ -27,6 +27,7 @@ node run.js scenarios/editor.lua         # the layout editor, saved and reloaded
 node run.js scenarios/presence.lua       # proximity triggers + alert announcements
 node run.js scenarios/security.lua       # roles, badge-in sessions, enrolment
 node run.js scenarios/backup.lua         # destroy a computer and rebuild it
+node run.js scenarios/rescan.lua         # peripherals appearing and vanishing silently
 node run.js scenarios/rules.lua          # automation, both exit paths
 node run.js scenarios/rule_editor.lua    # edit a rule on screen, engine picks it up
 node run.js scenarios/resilience.lua     # no monitor + forced alert
@@ -54,6 +55,12 @@ Virtual time advances **per event** (150ms each), not per `os.epoch` call: with
 the latter, a screen that happened to ask the time more often made the clock run
 faster, so a UI change could silently retime every scenario. A run of 200 events
 is about 30 seconds of simulated uptime.
+
+**A run is reproducible.** `math.random` is seeded to a fixed value in the mock:
+Lua 5.4 seeds it from the clock, and `demo_farm` drifts its buffer randomly, so
+without this a scenario that turned on a threshold failed a few times in a
+hundred - which makes a green run no evidence of anything. The seed is fixed in
+the harness only; BaseOS stays random in the world.
 
 ## What it does *not* cover
 

@@ -1,6 +1,13 @@
 -- Minimal ComputerCraft: Tweaked environment mock, enough to boot BaseOS
 -- outside Minecraft. Backed by __FILES (path -> contents) injected from Node.
 
+-- Lua 5.4 seeds `math.random` from the clock, so a module that drifts a value
+-- randomly (demo_farm does) made every run slightly different and a scenario
+-- that depended on a threshold failed a few times in a hundred. A run has to
+-- be reproducible to be evidence, so the seed is fixed here - in the harness,
+-- not in BaseOS, which should stay random in the world.
+math.randomseed(20260813)
+
 local files = {}
 for path, contents in pairs(__FILES) do files[path] = contents end
 
@@ -905,6 +912,9 @@ __TEST = {
     processed = function() return processed end,
     snapshots = function() return snapshots end,
     removePeripheral = function(name) peripherals[name] = nil end,
+    --- Swap what sits behind a name, with no event: a block broken and another
+    --- one placed in the same spot while the computer was running.
+    replacePeripheral = function(name, entry) peripherals[name] = entry end,
     detach = function(name)
         peripherals[name] = nil
         queue[#queue + 1] = { "peripheral_detach", name }

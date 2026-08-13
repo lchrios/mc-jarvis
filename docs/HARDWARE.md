@@ -73,6 +73,10 @@ No hay que configurar nada: los descubre solos.
 > El modem del *ordenador* es su conexión a la red de cable; el de un *bloque* es
 > lo que lo publica. Solo los segundos hay que activarlos con click derecho.
 
+No hace falta reiniciar nada al añadir un bloque: el ordenador vuelve a recorrer
+su red cada pocos segundos y lo recoge solo. Si tienes prisa, `RESCAN NOW` en la
+pantalla DEVICES.
+
 **Comprobar**
 
 ```
@@ -226,6 +230,8 @@ Para un módulo que corre en un nodo, el id lleva el nombre del nodo delante:
 | `MONITOR TOO SMALL` | El monitor es menor de 3x2 |
 | La UI no responde al tacto | El monitor es normal, no Advanced |
 | Un periférico no aparece | `scan`; ¿está activado su modem con click derecho? |
+| Acabas de activar un modem y no sale | Aparece solo en unos segundos, o `RESCAN NOW` en DEVICES |
+| Un bloque dejó de leerse sin tocarlo | Chunk descargado; se detecta solo y vuelve al recargarse |
 | Aparece pero no se lee | `probe` para ver qué métodos responden |
 | Un aparato de Advanced Peripherals no encaja | `probe <nombre>`; los tipos son snake_case (`player_detector`) |
 | El nodo no llega al master | `network:` en su terminal; ¿modem en los dos equipos? |
