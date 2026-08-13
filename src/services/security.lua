@@ -1,45 +1,74 @@
 --- Who is allowed to press what.
 --
 -- ComputerCraft's `monitor_touch` carries only (side, x, y) - verified in
--- MonitorBlockEntity - so a screen can never tell you who touched it. Two ways
--- around that, both supported:
+-- MonitorBlockEntity - so a screen can never tell you who touched it. The one
+-- identified click available is Advanced Peripherals' `playerClick`, fired when
+-- a player right-clicks the Player Detector block.
 --
---   mode = "session"    Right-click the Player Detector block to badge in.
---                       Advanced Peripherals fires `playerClick` with the
---                       player's name, which opens a short authenticated
---                       session. This is real identity.
+--   mode = "session"    Badge in at the detector; the next 60 seconds are
+--                       yours. Put the detector beside the monitor and it
+--                       behaves like an access card. This is real identity.
 --
---   mode = "proximity"  An authorised player must simply be within range of a
---                       detector. Weaker - anyone standing beside them can
---                       press the button - but needs no extra interaction.
+--   mode = "proximity"  An authorised player merely has to be in range.
+--                       Weaker: anyone beside them can press the button.
 --
--- Off unless `config/security.lua` enables it, and an action nobody protected
--- is always allowed: an update must never lock you out of your own base.
+-- Roles carry the permissions; users map a player to a role. Roles come from
+-- `config/security.lua`; users may also be added from the panel at runtime and
+-- are stored in `data/security.dat`, which the updater never touches.
+--
+-- Off unless enabled, and an unprotected action is always allowed: an update
+-- must never lock anyone out of their own base.
 
 local util = require("core.util")
 local logger = require("core.logger")
 local bus = require("core.event_bus")
 local state = require("core.state")
+local persistence = require("services.persistence")
 
 local log = logger.scoped("security")
 
 local security = {}
+
+security.STORE = "security"
+
+--- Roles shipped by default, so a base with `enabled = true` and no config of
+--- its own still makes sense.
+local DEFAULT_ROLES = {
+    admin = {
+        label = "Admin",
+        description = "Everything, and may manage users",
+        allow = { "*" },
+        manage = true,
+    },
+    operator = {
+        label = "Operator",
+        description = "Start and stop machinery",
+        allow = { "*.start", "*.stop", "*.flush" },
+    },
+    viewer = {
+        label = "Viewer",
+        description = "Look, do not touch",
+        allow = {},
+    },
+}
 
 local settings = {
     enabled = false,
     mode = "session",
     sessionSeconds = 60,
     detectorRadius = 8,
-    profiles = {},
+    enrollSeconds = 30,
+    roles = {},
+    users = {},          -- seed users from config
     protect = {},
-    -- When the detector is missing, allow or refuse? Refusing is safer but can
-    -- strand you; the default keeps the base usable and says so in the log.
     failOpen = true,
 }
 
 local context = nil
-local session = nil     -- { player, profile, expiresAt, source }
-local denials = {}      -- recent refusals, for the UI
+local session = nil      -- { player, role, expiresAt, source }
+local users = {}         -- [lowercased player] = { player, role, addedBy, addedAt }
+local denials = {}
+local enrollment = nil   -- { role, requestedBy, expiresAt, candidate }
 
 ---------------------------------------------------------------------------
 -- Patterns
@@ -66,84 +95,166 @@ local function matchesAny(action, patterns)
     return false
 end
 
---- Is this action guarded at all?
 function security.isProtected(action)
     if not settings.enabled then return false end
     return matchesAny(action, settings.protect)
 end
 
 ---------------------------------------------------------------------------
--- Profiles
+-- Roles and users
 ---------------------------------------------------------------------------
 
---- The profile a player belongs to, or nil.
-function security.profileOf(player)
-    if not player then return nil end
-    local wanted = tostring(player):lower()
-
-    for name, profile in pairs(settings.profiles) do
-        for _, candidate in ipairs(profile.players or {}) do
-            if tostring(candidate):lower() == wanted then return name, profile end
-        end
+function security.roles()
+    local list = {}
+    for id, role in pairs(settings.roles) do
+        list[#list + 1] = {
+            id = id,
+            label = role.label or id,
+            description = role.description,
+            allow = role.allow or {},
+            manage = role.manage == true,
+        }
     end
-    return nil
+    table.sort(list, function(a, b) return a.id < b.id end)
+    return list
+end
+
+function security.role(id) return settings.roles[id] end
+
+local function key(player) return tostring(player or ""):lower() end
+
+--- Every registered player, alphabetically.
+function security.users()
+    local list = {}
+    for _, user in pairs(users) do list[#list + 1] = util.deepCopy(user) end
+    table.sort(list, function(a, b) return a.player:lower() < b.player:lower() end)
+    return list
+end
+
+function security.user(player) return users[key(player)] end
+
+function security.roleOf(player)
+    local user = users[key(player)]
+    return user and user.role or nil
 end
 
 --- May this player run this action?
 function security.can(player, action)
-    local name, profile = security.profileOf(player)
-    if not profile then return false, "no profile for '" .. tostring(player) .. "'" end
-    if not matchesAny(action, profile.allow) then
-        return false, "profile '" .. name .. "' may not run " .. action
+    local roleId = security.roleOf(player)
+    if not roleId then return false, "'" .. tostring(player) .. "' is not registered" end
+
+    local role = settings.roles[roleId]
+    if not role then return false, "role '" .. roleId .. "' no longer exists" end
+    if not matchesAny(action, role.allow) then
+        return false, "role '" .. roleId .. "' may not run " .. action
     end
     return true
 end
 
-function security.players()
-    local list = {}
-    for name, profile in pairs(settings.profiles) do
-        for _, player in ipairs(profile.players or {}) do
-            list[#list + 1] = { player = player, profile = name }
-        end
+--- May this player add and remove other users?
+function security.canManage(player)
+    local roleId = security.roleOf(player)
+    local role = roleId and settings.roles[roleId]
+    return role ~= nil and role.manage == true
+end
+
+---------------------------------------------------------------------------
+-- Persistence
+---------------------------------------------------------------------------
+
+local function publishUsers()
+    state.set("security.users", security.users())
+end
+
+local function saveUsers()
+    -- Only runtime additions are written; config seeds stay in config.
+    local stored = {}
+    for _, user in pairs(users) do
+        if not user.fromConfig then stored[#stored + 1] = user end
     end
-    table.sort(list, function(a, b) return a.player < b.player end)
-    return list
+    persistence.save(security.STORE, { users = stored })
+    publishUsers()
+end
+
+--- Register a player. Returns ok, error.
+function security.addUser(player, roleId, addedBy)
+    player = tostring(player or ""):gsub("%s+", "")
+    if player == "" then return false, "a player name is required" end
+    if not settings.roles[roleId] then return false, "unknown role '" .. tostring(roleId) .. "'" end
+
+    users[key(player)] = {
+        player = player,
+        role = roleId,
+        addedBy = addedBy,
+        addedAt = util.nowMs(),
+    }
+    saveUsers()
+
+    log.info("'%s' registered as %s by %s", player, roleId, tostring(addedBy or "config"))
+    bus.emit("security.user_added", { player = player, role = roleId, addedBy = addedBy })
+    return true
+end
+
+function security.removeUser(player)
+    local user = users[key(player)]
+    if not user then return false, "not registered" end
+    if user.fromConfig then
+        return false, "declared in config/security.lua; remove it there"
+    end
+
+    users[key(player)] = nil
+    saveUsers()
+
+    -- A removed player must not keep an open session.
+    if session and key(session.player) == key(player) then security.revoke() end
+
+    log.info("'%s' removed", tostring(player))
+    bus.emit("security.user_removed", { player = user.player })
+    return true
+end
+
+function security.setRole(player, roleId)
+    local user = users[key(player)]
+    if not user then return false, "not registered" end
+    if not settings.roles[roleId] then return false, "unknown role" end
+    if user.fromConfig then return false, "declared in config/security.lua" end
+
+    user.role = roleId
+    saveUsers()
+    if session and key(session.player) == key(player) then session.role = roleId end
+    return true
 end
 
 ---------------------------------------------------------------------------
 -- Sessions
 ---------------------------------------------------------------------------
 
---- Open an authenticated session. Called when a known player badges in.
 function security.grant(player, source)
-    local name, profile = security.profileOf(player)
-    if not profile then
-        log.warn("'%s' badged in but has no profile", tostring(player))
-        security.recordDenial("(badge in)", tostring(player), "no profile")
+    local roleId = security.roleOf(player)
+    if not roleId then
+        log.warn("'%s' badged in but is not registered", tostring(player))
+        security.recordDenial("(badge in)", tostring(player), "not registered")
         return false
     end
 
     session = {
         player = player,
-        profile = name,
+        role = roleId,
         source = source or "playerClick",
         expiresAt = util.nowMs() + settings.sessionSeconds * 1000,
     }
     state.set("security.session", util.deepCopy(session))
-    log.info("session opened for '%s' (%s)", tostring(player), name)
-    bus.emit("security.session_opened", { player = player, profile = name })
+    log.info("session opened for '%s' (%s)", tostring(player), roleId)
+    bus.emit("security.session_opened", { player = player, role = roleId })
     return true
 end
 
 function security.revoke()
-    if session then
-        bus.emit("security.session_closed", { player = session.player })
-    end
+    if session then bus.emit("security.session_closed", { player = session.player }) end
     session = nil
     state.set("security.session", nil)
 end
 
---- The live session, or nil when there is none or it has expired.
 function security.session()
     if not session then return nil end
     if util.nowMs() > session.expiresAt then
@@ -160,10 +271,60 @@ function security.sessionRemaining()
 end
 
 ---------------------------------------------------------------------------
+-- Enrolment
+---------------------------------------------------------------------------
+
+--- Arm "the next player to touch the detector is the one I mean".
+-- Only somebody who may manage users can arm it, and their own clicks are
+-- ignored while it is armed - otherwise the admin enrols themselves.
+function security.armEnrollment(roleId, requestedBy)
+    if not settings.roles[roleId] then return false, "unknown role" end
+    if not security.canManage(requestedBy) then
+        return false, "only a role that may manage users can do this"
+    end
+
+    enrollment = {
+        role = roleId,
+        requestedBy = requestedBy,
+        expiresAt = util.nowMs() + settings.enrollSeconds * 1000,
+        candidate = nil,
+    }
+    state.set("security.enrolling", { role = roleId, by = requestedBy })
+    log.info("listening for a new %s, armed by %s", roleId, tostring(requestedBy))
+    bus.emit("security.enroll_armed", { role = roleId, by = requestedBy })
+    return true
+end
+
+function security.cancelEnrollment()
+    enrollment = nil
+    state.set("security.enrolling", nil)
+    bus.emit("security.enroll_cancelled", {})
+end
+
+--- The armed request, or nil when there is none or it expired.
+function security.enrollment()
+    if not enrollment then return nil end
+    if util.nowMs() > enrollment.expiresAt then
+        security.cancelEnrollment()
+        return nil
+    end
+    return enrollment
+end
+
+--- Accept the captured candidate. Returns ok, error.
+function security.confirmEnrollment()
+    local request = security.enrollment()
+    if not request or not request.candidate then return false, "nobody to confirm" end
+
+    local ok, err = security.addUser(request.candidate, request.role, request.requestedBy)
+    security.cancelEnrollment()
+    return ok, err
+end
+
+---------------------------------------------------------------------------
 -- Proximity
 ---------------------------------------------------------------------------
 
---- Authorised players currently within range of a detector.
 local function nearbyAuthorised(action)
     if not context then return nil, "security not initialised" end
 
@@ -212,7 +373,6 @@ function security.check(action)
         return false, reason or "not authorised"
     end
 
-    -- Session mode.
     local active = security.session()
     if not active then
         security.recordDenial(action, nil, "no session")
@@ -234,29 +394,79 @@ end
 -- Wiring
 ---------------------------------------------------------------------------
 
-function security.start(ctx)
-    context = ctx
-    for key, value in pairs(ctx.config.section("security") or {}) do
-        settings[key] = value
+local function loadUsers()
+    users = {}
+
+    for _, entry in ipairs(settings.users or {}) do
+        if entry.player then
+            users[key(entry.player)] = {
+                player = entry.player,
+                role = entry.role or "viewer",
+                addedBy = "config",
+                fromConfig = true,
+            }
+        end
     end
 
+    local stored = persistence.load(security.STORE, nil)
+    for _, entry in ipairs((stored and stored.users) or {}) do
+        if entry.player and not (users[key(entry.player)] or {}).fromConfig then
+            users[key(entry.player)] = entry
+        end
+    end
+
+    publishUsers()
+end
+
+--- A player touched the detector: either enrolling somebody, or badging in.
+local function onPlayerClick(player)
+    local name = type(player) == "table" and (player.name or player.username) or player
+    if not name then return end
+
+    local request = security.enrollment()
+    if request then
+        -- The admin who armed it keeps badging in as themselves.
+        if key(name) ~= key(request.requestedBy) then
+            request.candidate = name
+            state.set("security.enrolling", {
+                role = request.role, by = request.requestedBy, candidate = name,
+            })
+            log.info("captured '%s' for enrolment as %s", tostring(name), request.role)
+            bus.emit("security.enroll_candidate", { player = name, role = request.role })
+            return
+        end
+    end
+
+    security.grant(name, "playerClick")
+end
+
+function security.start(ctx)
+    context = ctx
+
+    settings.roles = util.deepCopy(DEFAULT_ROLES)
+    for key_, value in pairs(ctx.config.section("security") or {}) do
+        if key_ == "roles" then
+            settings.roles = util.deepMerge(settings.roles, value)
+        else
+            settings[key_] = value
+        end
+    end
+
+    loadUsers()
     state.set("security.enabled", settings.enabled)
     state.set("security.mode", settings.mode)
+
+    bus.offOwner("security")
 
     if not settings.enabled then
         log.info("security disabled: every action is allowed")
         return false
     end
 
-    -- Advanced Peripherals fires this when a player right-clicks the detector
-    -- block. It is the only identified click BaseOS can see.
-    bus.on("playerClick", function(player)
-        local name = type(player) == "table" and (player.name or player.username) or player
-        security.grant(name, "playerClick")
-    end, { owner = "security" })
+    bus.on("playerClick", onPlayerClick, { owner = "security" })
 
-    log.info("security on: %s mode, %d profile(s), %d protected pattern(s)",
-        settings.mode, util.count(settings.profiles), #settings.protect)
+    log.info("security on: %s mode, %d role(s), %d user(s), %d protected pattern(s)",
+        settings.mode, util.count(settings.roles), util.count(users), #settings.protect)
     return true
 end
 
@@ -265,6 +475,7 @@ function security.settings() return util.deepCopy(settings) end
 function security.shutdown()
     bus.offOwner("security")
     security.revoke()
+    security.cancelEnrollment()
 end
 
 return security

@@ -1,64 +1,63 @@
 --- Quién puede accionar qué.
 --
--- IMPORTANTE — lo que se puede y no se puede saber:
+-- LO QUE SE PUEDE Y NO SE PUEDE SABER
 --
--- El evento `monitor_touch` de ComputerCraft trae solo (lado, x, y). **No hay
--- forma de saber quién tocó la pantalla.** Verificado en el propio jar.
+-- El evento `monitor_touch` de ComputerCraft trae solo (lado, x, y).
+-- **No hay forma de saber quién tocó la pantalla.** Verificado en el jar.
 --
--- Por eso hay dos modos:
+-- La única identidad real disponible es `playerClick`: Advanced Peripherals lo
+-- emite con tu nombre cuando haces **clic derecho sobre el bloque Player
+-- Detector**. Por eso el modo recomendado es `session`:
 --
---   mode = "session"    Clic derecho sobre el bloque Player Detector para
---                       identificarte. Advanced Peripherals emite `playerClick`
---                       con tu nombre y se abre una sesión de unos segundos.
---                       Es identidad real: sabemos exactamente quién.
+--     Pon el Player Detector JUNTO AL MONITOR.
+--     Clic derecho = iniciar sesión. Los siguientes 60 s puedes accionar.
 --
---   mode = "proximity"  Basta con que un jugador autorizado esté dentro del
---                       radio del detector. Más cómodo pero más débil:
---                       cualquiera a su lado puede pulsar el botón.
+--   mode = "proximity" es la alternativa floja: basta con que un autorizado
+--   esté en el radio, así que cualquiera a su lado también acciona.
 --
--- Recomendación: pon el Player Detector **junto al monitor**. Con `session`
--- funciona como una tarjeta de acceso — tocas el detector y el panel se
--- desbloquea unos segundos.
+-- Los usuarios se gestionan desde la pantalla ACCESS del panel y se guardan en
+-- `data/security.dat`. Lo que declares aquí abajo es la semilla: no se puede
+-- borrar desde el panel, que es como te aseguras de no quedarte fuera.
 --
--- Desactivado por defecto. Sin `protect`, todo está permitido.
+-- Desactivado por defecto, y sin `protect` todo está permitido.
 
 return {
     enabled = false,
 
     mode = "session",        -- session | proximity
 
-    -- Segundos que dura la sesión tras identificarte. Cada acción la renueva.
-    sessionSeconds = 60,
+    sessionSeconds = 60,     -- lo que dura la sesión; cada acción la renueva
+    enrollSeconds = 30,      -- ventana del modo escucha al registrar a alguien
+    detectorRadius = 8,      -- solo para mode = "proximity"
 
-    -- Radio en bloques para el modo proximity.
-    detectorRadius = 8,
-
-    -- Si no hay Player Detector conectado: true permite igualmente (y lo avisa
-    -- en el log), false bloquea. `true` evita quedarte fuera de tu propia base
-    -- si el detector se rompe.
+    -- Si no hay Player Detector conectado: true permite igual (y lo avisa en el
+    -- log), false bloquea. `true` evita que un bloque roto te deje sin control.
     failOpen = true,
 
     -- Acciones que requieren autorización. El resto siempre están permitidas.
-    -- El id de una acción es "<modulo>.<accion>", y admite comodines:
-    --     "*"                todo
-    --     "demo_farm.*"      cualquier acción de ese módulo
-    --     "*.stop"           la acción "stop" de cualquier módulo
+    -- El id es "<modulo>.<accion>" y admite comodines:
+    --     "*"              todo
+    --     "demo_farm.*"    cualquier acción de ese módulo
+    --     "*.stop"         la acción "stop" de cualquier módulo
     protect = {
         -- "*.stop",
         -- "*.start",
         -- "*.reboot",
-        -- "power.*",
     },
 
-    -- Perfiles. Cada uno lista jugadores y qué se les permite.
-    profiles = {
-        -- admin = {
-        --     players = { "lchrios" },
-        --     allow = { "*" },
-        -- },
-        -- operator = {
-        --     players = { "amigo1", "amigo2" },
-        --     allow = { "*.start", "*.stop" },
-        -- },
+    -- Roles: qué puede hacer cada categoría. Estos tres vienen de serie y
+    -- puedes redefinirlos o añadir los tuyos.
+    --
+    --   manage = true  ese rol puede registrar y quitar usuarios desde el panel
+    roles = {
+        -- admin    = { label = "Admin",    allow = { "*" }, manage = true },
+        -- operator = { label = "Operator", allow = { "*.start", "*.stop" } },
+        -- viewer   = { label = "Viewer",   allow = {} },
+    },
+
+    -- Semilla de usuarios. Pon aquí al menos un admin: es tu llave maestra, y
+    -- no se puede borrar desde la pantalla.
+    users = {
+        -- { player = "lchrios", role = "admin" },
     },
 }

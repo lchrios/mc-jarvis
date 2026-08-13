@@ -25,7 +25,7 @@ node run.js scenarios/display.lua        # a display node pinned to one view
 node run.js scenarios/map.lua            # base map: routed links reacting to state
 node run.js scenarios/editor.lua         # the layout editor, saved and reloaded
 node run.js scenarios/presence.lua       # proximity triggers + alert announcements
-node run.js scenarios/security.lua       # permission profiles, both modes
+node run.js scenarios/security.lua       # roles, badge-in sessions, enrolment
 node run.js scenarios/resilience.lua     # no monitor + forced alert
 node run.js scenarios/modal.lua          # confirm dialog + log viewer
 node run.js scenarios/installer.lua      # install from a fake GitHub, then boot

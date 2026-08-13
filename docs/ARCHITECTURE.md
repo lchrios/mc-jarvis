@@ -73,7 +73,8 @@ src/
     base_links.lua       Trazado de las conexiones entre zonas
     components/          label, button, panel, progress_bar, list, modal,
                          pager, zone_tile
-    screens/             dashboard, base_map, layout_editor, module_detail,
+    screens/             dashboard, base_map, layout_editor, security,
+                         name_entry, module_detail,
                          metric_detail,
                          module_list, alerts, peripherals, logs, nodes,
                          power_detail, display_view

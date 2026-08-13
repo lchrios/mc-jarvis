@@ -19,6 +19,7 @@ local List = require("ui.components.list")
 local StatTile = require("ui.components.stat_tile")
 local registry = require("modules.registry")
 local activity = require("services.activity")
+local security = require("services.security")
 local alerts = require("services.alerts")
 local history = require("services.history")
 local state = require("core.state")
@@ -193,6 +194,11 @@ function Dashboard:actionSpecs()
         { label = "DEVICES", screen = "peripherals" },
         { label = "LOGS", screen = "logs" },
     }
+
+    -- Only worth a slot on a base that actually gates anything.
+    if security.settings().enabled then
+        table.insert(specs, #specs, { label = "ACCESS", screen = "security" })
+    end
     return specs
 end
 

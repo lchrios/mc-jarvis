@@ -32,12 +32,11 @@ return {
     enabled = true,
     mode = "session",
     sessionSeconds = 30,
-    detectorRadius = 8,
+    enrollSeconds = 30,
     failOpen = false,
     protect = { "*.stop", "*.start" },
-    profiles = {
-        admin = { players = { "lchrios" }, allow = { "*" } },
-        guest = { players = { "visitante" }, allow = { "*.start" } },
+    users = {
+        { player = "lchrios", role = "admin" },
     },
 }
 ]]
@@ -82,7 +81,7 @@ __TEST.injectAt(26, function()
     local session = security().session()
     check(session ~= nil, "playerClick opened a session")
     check(session and session.player == "lchrios", "for the player who clicked")
-    check(session and session.profile == "admin", "matched to their profile")
+    check(session and session.role == "admin", "matched to their role")
 
     local ok = registry().invoke("demo_farm", "stop")
     check(ok, "and now the protected action runs")
@@ -90,28 +89,76 @@ __TEST.injectAt(26, function()
 end)
 
 ------------------------------------------------------- profile limits
+------------------------------------------------------- enrolling by click
 __TEST.injectAt(30, function()
-    return { "playerClick", "visitante" }
+    -- An admin arms listening mode, then somebody else touches the detector.
+    local ok, err = security().armEnrollment("operator", "lchrios")
+    check(ok, "an admin can arm listening mode (" .. tostring(err) .. ")")
+    check(security().enrollment() ~= nil, "and it is armed")
 end)
 
 __TEST.injectAt(34, function()
-    check(security().session().profile == "guest", "a second badge in replaces the session")
-
-    local ok = registry().invoke("demo_farm", "start")
-    check(ok, "the guest may start")
-
-    local stopped, err = registry().invoke("demo_farm", "stop")
-    check(stopped == false, "but not stop")
-    check(tostring(err):find("guest", 1, true) ~= nil,
-        "and the refusal names the profile (" .. tostring(err) .. ")")
+    -- The admin badging in again must not enrol themselves.
+    return { "playerClick", "lchrios" }
 end)
 
-------------------------------------------------------- unknown player
 __TEST.injectAt(38, function()
-    return { "playerClick", "desconocido" }
+    check(security().enrollment().candidate == nil,
+        "the admin's own clicks are ignored while listening")
+    return { "playerClick", "visitante" }
 end)
 
 __TEST.injectAt(42, function()
+    local request = security().enrollment()
+    check(request and request.candidate == "visitante", "the next player is captured")
+    check(security().user("visitante") == nil, "but not registered until confirmed")
+
+    local ok = security().confirmEnrollment()
+    check(ok, "confirming registers them")
+    check(security().roleOf("visitante") == "operator", "with the chosen role")
+    check(security().enrollment() == nil, "and listening stops")
+end)
+
+------------------------------------------------------- role limits
+__TEST.injectAt(46, function()
+    return { "playerClick", "visitante" }
+end)
+
+__TEST.injectAt(50, function()
+    check(security().session().role == "operator", "a second badge in replaces the session")
+
+    local ok = registry().invoke("demo_farm", "start")
+    check(ok, "the operator may start")
+
+    check(security().canManage("visitante") == false, "but may not manage users")
+
+    local added, err = security().armEnrollment("admin", "visitante")
+    check(added == false, "and cannot arm listening mode")
+    check(tostring(err):find("manage", 1, true) ~= nil, "with a reason (" .. tostring(err) .. ")")
+end)
+
+------------------------------------------------------- adding by name
+__TEST.injectAt(54, function()
+    local ok = security().addUser("amigo", "viewer", "lchrios")
+    check(ok, "a player can be added by name")
+    check(security().roleOf("amigo") == "viewer", "with the role given")
+    check(__TEST.files["data/security.dat"] ~= nil, "and it is written to data/")
+
+    local removed = security().removeUser("amigo")
+    check(removed, "and removed again")
+    check(security().roleOf("amigo") == nil, "leaving no access")
+
+    local protectedUser, reason = security().removeUser("lchrios")
+    check(protectedUser == false, "a user declared in config cannot be removed from the panel")
+    check(tostring(reason):find("config", 1, true) ~= nil, "and says where to edit it")
+end)
+
+------------------------------------------------------- unknown player
+__TEST.injectAt(58, function()
+    return { "playerClick", "desconocido" }
+end)
+
+__TEST.injectAt(62, function()
     -- The previous session is untouched: an unknown player cannot take it over,
     -- but neither does badging in as a stranger grant anything.
     local denials = security().denials()
@@ -119,37 +166,37 @@ __TEST.injectAt(42, function()
     for _, denial in ipairs(denials) do
         if denial.player == "desconocido" then sawUnknown = true end
     end
-    check(sawUnknown, "an unknown player badging in is recorded as a denial")
+    check(sawUnknown, "an unregistered player badging in is recorded as a denial")
 end)
 
 ------------------------------------------------------- session expiry
-__TEST.injectAt(46, function()
+__TEST.injectAt(66, function()
     local session = security().session()
     if session then session.expiresAt = 0 end
 end)
 
-__TEST.injectAt(50, function()
+__TEST.injectAt(70, function()
     check(security().session() == nil, "a session expires")
     local ok = registry().invoke("demo_farm", "stop")
     check(ok == false, "and protection comes back")
 end)
 
 ------------------------------------------------------- proximity mode
-__TEST.injectAt(54, function()
+__TEST.injectAt(74, function()
     -- Switch modes in place rather than rebooting the whole scenario.
     local settings = security().settings()
     settings.mode = "proximity"
     security().start(BASEOS.loaded["core.app"].context())
 end)
 
-__TEST.injectAt(58, function()
+__TEST.injectAt(78, function()
     -- start() re-reads config, so force the mode through the config layer.
     BASEOS.loaded["core.config"].set("security.mode", "proximity")
     security().start(BASEOS.loaded["core.app"].context())
     __TEST.setPlayers({})
 end)
 
-__TEST.injectAt(64, function()
+__TEST.injectAt(84, function()
     check(security().settings().mode == "proximity", "proximity mode is active")
     local ok, err = registry().invoke("demo_farm", "stop")
     check(ok == false, "with nobody in range the action is refused")
@@ -157,11 +204,11 @@ __TEST.injectAt(64, function()
         "and says so (" .. tostring(err) .. ")")
 end)
 
-__TEST.injectAt(68, function()
+__TEST.injectAt(88, function()
     __TEST.setPlayers({ { name = "lchrios", distance = 3 } })
 end)
 
-__TEST.injectAt(72, function()
+__TEST.injectAt(92, function()
     local ok = registry().invoke("demo_farm", "stop")
     check(ok, "an authorised player in range unlocks it")
 

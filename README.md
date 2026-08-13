@@ -154,13 +154,33 @@ pantalla.** Por eso hay dos modos:
 Con `session`, pon el detector **junto al monitor** y funciona como una tarjeta
 de acceso: lo tocas y el panel se desbloquea unos segundos.
 
+Los **roles** llevan los permisos y los **usuarios** asignan jugador a rol:
+
 ```lua
-protect  = { "*.stop", "*.start" },
-profiles = {
-    admin    = { players = { "lchrios" }, allow = { "*" } },
-    operator = { players = { "amigo" },   allow = { "*.start", "*.stop" } },
+protect = { "*.stop", "*.start" },
+roles = {
+    admin    = { label = "Admin",    allow = { "*" }, manage = true },
+    operator = { label = "Operator", allow = { "*.start", "*.stop" } },
+    viewer   = { label = "Viewer",   allow = {} },
 },
+users = { { player = "lchrios", role = "admin" } },
 ```
+
+### Dar de alta gente desde el panel
+
+Con seguridad activada aparece el botón **ACCESS** en el dashboard. Un rol con
+`manage` puede registrar a otros de dos formas:
+
+* **LISTEN** — el admin lo pulsa y la máquina queda a la escucha: el
+  **siguiente** jugador que toque el detector queda capturado y la pantalla
+  pregunta *"¿registro a fulano como operator?"* antes de nada. Los clics del
+  propio admin se ignoran mientras escucha, para que no se registre a sí mismo.
+* **TYPE** — teclado en pantalla, para alguien que no está delante. Un monitor
+  no tiene teclado: `read()` solo existe en la terminal del ordenador.
+
+Lo registrado desde el panel va a `data/security.dat`. Lo declarado en
+`config/security.lua` es la semilla y **no se puede borrar desde la pantalla**:
+esa es tu llave maestra.
 
 Desactivado por defecto, y sin `protect` todo está permitido: una actualización
 nunca debe dejarte fuera de tu propia base.
