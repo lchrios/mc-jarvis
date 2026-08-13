@@ -16,10 +16,18 @@ local CATEGORY_METHODS = {
     crafting = { "craftItem", "requestCrafting" },
 }
 
+-- Verified against the AdvancedPeripherals 0.7.62b jar: the type ids are
+-- snake_case. The camelCase spellings are what the old wiki shows, kept here
+-- only so an older build still gets labelled.
 local ADVANCED_PERIPHERALS = {
+    me_bridge = true, rs_bridge = true, chat_box = true, player_detector = true,
+    environment_detector = true, energy_detector = true, inventory_manager = true,
+    block_reader = true, geo_scanner = true, nbt_storage = true,
+    colony_integrator = true,
+
     meBridge = true, rsBridge = true, chatBox = true, playerDetector = true,
     environmentDetector = true, energyDetector = true, inventoryManager = true,
-    redstoneIntegrator = true, blockReader = true, geoScanner = true,
+    blockReader = true, geoScanner = true,
 }
 
 ---------------------------------------------------------------------------
