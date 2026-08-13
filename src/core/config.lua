@@ -19,7 +19,8 @@ local log = logger.scoped("config")
 local config = {}
 
 --- Files loaded from /config, in merge order.
-config.FILES = { "system", "peripherals", "layout", "modules", "network", "theme", "security" }
+config.FILES = { "system", "peripherals", "layout", "modules", "network", "theme",
+    "security", "rules" }
 
 --- Built-in defaults. Anything referenced by the core must have a default here
 --- so BaseOS still boots on a computer with an empty /config directory.
@@ -107,6 +108,12 @@ local DEFAULTS = {
     theme = {
         preset = "dark",
         overrides = {},
+    },
+
+    rules = {
+        enabled = true,
+        interval = 2,      -- seconds between evaluations
+        rules = {},
     },
 
     security = {

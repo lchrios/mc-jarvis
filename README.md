@@ -185,6 +185,35 @@ esa es tu llave maestra.
 Desactivado por defecto, y sin `protect` todo está permitido: una actualización
 nunca debe dejarte fuera de tu propia base.
 
+## Automatizaciones
+
+Una regla **no es un temporizador**. Es una máquina de dos estados: entra cuando
+se cumple `when`, y sale cuando se cumple `until_` **o** pasa `after`, lo que
+ocurra primero.
+
+```lua
+{
+    id     = "backpressure",
+    when   = { metric = "mob_farm.buffer", op = ">=", value = 0.9 },
+    do_    = "mob_farm.stop",
+    until_ = { metric = "mob_farm.buffer", op = "<=", value = 0.3 },
+    after  = "60s",
+    then_  = "mob_farm.start",
+}
+```
+
+Decir "párate 30 segundos" desperdicia producción si el buffer se vació a los
+15, y reenciende contra un buffer lleno si no se vació. Con las dos salidas, se
+arranca en cuanto de verdad se vació, y el tiempo es solo la red de seguridad.
+
+Las condiciones miran métricas, estado, **tendencia** del histórico, hora del
+mundo, jugadores conectados, alertas activas y nodos caídos; se combinan con
+`all` / `any` / `none`.
+
+**Si tocas el botón a mano, tú ganas.** La regla suelta el control y no vuelve a
+intervenir hasta que su condición de entrada deje de cumplirse y vuelva a
+cumplirse. Así no te pelea por el interruptor.
+
 ## Copias de seguridad
 
 `updater` devuelve los programas; lo que no se puede volver a descargar es lo
