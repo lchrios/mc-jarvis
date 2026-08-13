@@ -61,6 +61,7 @@ cambió, no el proyecto entero.
 | `updater dev` | Trabaja contra otra rama o etiqueta |
 | `version` | Qué tienes instalado, sin tocar la red |
 | `scan` | Qué periféricos ve el ordenador y qué puede leer de ellos |
+| `probe` | Llama a los métodos de Advanced Peripherals y enseña qué responde |
 
 Tu `config/` y tu `data/` **no** se sobrescriben nunca. La versión instalada, la
 rama y el commit se ven en el tile **CENTRAL HUB**.
@@ -166,6 +167,10 @@ la config por defecto.
 * Adaptadores genéricos (inventarios, energía, fluidos) y esqueletos para AE2,
   Powah y Advanced Peripherals, todos con detección de capacidades.
 * Servicio de alertas con severidades y capa de red rednet lista pero apagada.
+* Módulo `presence`: puertas y mecanismos que se encienden al acercarse un
+  jugador, con radio, filtro por jugador, retardo de cierre y control manual.
+* Módulo `notifier`: manda las alertas al Chat Box y al altavoz, con límite de
+  ritmo para que una alerta que oscila no inunde el chat.
 
 ## Configuración
 

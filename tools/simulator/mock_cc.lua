@@ -343,6 +343,80 @@ local function makeFarmOutput(options)
     }
 end
 
+-- Advanced Peripherals stand-ins. Method names match what the adapters try
+-- first; the point is to exercise the modules, not to prove AP's real API,
+-- which only `probe` in game can do.
+local playersInRange = {}
+local chatLog = {}
+local soundLog = {}
+
+local function makePlayerDetector()
+    return {
+        getOnlinePlayers = function()
+            -- AP returns plain names; the scenario may carry distances.
+            local all = {}
+            for _, entry in ipairs(playersInRange) do
+                all[#all + 1] = type(entry) == "table" and entry.name or entry
+            end
+            return all
+        end,
+        getPlayersInRange = function(range)
+            local found = {}
+            for _, entry in ipairs(playersInRange) do
+                if type(entry) == "string" then
+                    found[#found + 1] = entry
+                elseif (entry.distance or 0) <= (range or 8) then
+                    found[#found + 1] = entry.name
+                end
+            end
+            return found
+        end,
+        isPlayerInRange = function(range, player)
+            for _, entry in ipairs(playersInRange) do
+                local name = type(entry) == "string" and entry or entry.name
+                if name == player then return true end
+            end
+            return false
+        end,
+        getPlayerPos = function() return { x = 0, y = 64, z = 0 } end,
+    }
+end
+
+local function makeChatBox()
+    return {
+        sendMessage = function(message, prefix)
+            chatLog[#chatLog + 1] = { message = message, prefix = prefix }
+            return true
+        end,
+        sendMessageToPlayer = function(message, player, prefix)
+            chatLog[#chatLog + 1] = { message = message, player = player, prefix = prefix }
+            return true
+        end,
+    }
+end
+
+local function makeSpeaker()
+    return {
+        playSound = function(sound, volume, pitch)
+            soundLog[#soundLog + 1] = { sound = sound, volume = volume, pitch = pitch }
+            return true
+        end,
+        playNote = function(instrument)
+            soundLog[#soundLog + 1] = { note = instrument }
+            return true
+        end,
+    }
+end
+
+local function makeRedstoneIntegrator()
+    local outputs = {}
+    return {
+        setOutput = function(side, value) outputs[side] = value and true or false return true end,
+        getOutput = function(side) return outputs[side] == true end,
+        getInput = function() return false end,
+    }
+end
+
 -- Monitor size is overridable so scenarios can check how the UI scales.
 local monitor = makeTerm(tonumber(__MONITOR_W) or 82, tonumber(__MONITOR_H) or 25, "monitor_0")
 local farmOutput = makeFarmOutput({ side = "back", rate = 4 })
@@ -751,6 +825,34 @@ __TEST = {
     farmOutput = farmOutput,
     --- Current redstone output state, as the farm module left it.
     redstone = function(side) return redstoneOutputs[side] == true end,
+
+    --- Attach an Advanced Peripherals device by type.
+    addAdvancedPeripheral = function(kind, name)
+        local factories = {
+            playerDetector = makePlayerDetector,
+            chatBox = makeChatBox,
+            redstoneIntegrator = makeRedstoneIntegrator,
+        }
+        local factory = factories[kind]
+        if not factory then error("no mock for " .. tostring(kind), 2) end
+        peripherals[name or (kind .. "_0")] = { types = { kind }, object = factory() }
+    end,
+
+    addSpeaker = function(name)
+        peripherals[name or "speaker_0"] = { types = { "speaker" }, object = makeSpeaker() }
+    end,
+
+    --- Who the player detector reports. Entries are names, or
+    --- { name = "x", distance = 4 } to test radius filtering.
+    setPlayers = function(list) playersInRange = list or {} end,
+
+    --- What the chat box and speaker were asked to emit.
+    chatLog = function() return chatLog end,
+    soundLog = function() return soundLog end,
+    clearChatLog = function()
+        for index = #chatLog, 1, -1 do chatLog[index] = nil end
+        for index = #soundLog, 1, -1 do soundLog[index] = nil end
+    end,
 
     --- Pin the monitor size, for scenarios whose subject is the layout itself
     --- and which must not change meaning with MONITOR_W/MONITOR_H.

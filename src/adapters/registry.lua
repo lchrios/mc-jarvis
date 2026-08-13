@@ -27,6 +27,7 @@ registry.BUILTIN = {
     "adapters.inventory",
     "adapters.energy",
     "adapters.fluid",
+    "adapters.speaker",
 }
 
 function registry.setPeripheralManager(manager) peripherals = manager end

@@ -63,6 +63,51 @@ return {
     -- Configuración libre por módulo, se lee con
     -- ctx.config.get("modules.settings.<id>.<clave>").
     settings = {
+        -- ------------------------------------------------------------------
+        -- PRESENCIA  (necesita un Player Detector de Advanced Peripherals)
+        --
+        -- Cada zona tiene un radio en bloques, una salida y un `holdFor`: los
+        -- segundos que la salida sigue encendida tras irse el último jugador,
+        -- para que una puerta no se cierre en tus narices.
+        --
+        -- `output.kind`:
+        --     "redstone"    una cara de este mismo ordenador
+        --     "integrator"  una cara de un Redstone Integrator
+        --     "none"        solo detectar, sin accionar nada
+        -- `players` limita la zona a jugadores concretos; sin él, cualquiera.
+        -- ------------------------------------------------------------------
+        presence = {
+            zones = {
+                -- {
+                --     id = "front_door",
+                --     name = "Puerta principal",
+                --     radius = 5,
+                --     holdFor = 3,
+                --     output = { kind = "redstone", side = "left" },
+                -- },
+                -- {
+                --     id = "vault",
+                --     name = "Bóveda",
+                --     radius = 3,
+                --     players = { "lchrios" },
+                --     output = { kind = "integrator", side = "top" },
+                -- },
+            },
+        },
+
+        -- ------------------------------------------------------------------
+        -- AVISOS  (Chat Box de Advanced Peripherals y/o un Speaker)
+        --
+        -- No hace falta configurar nada: detecta los sinks que haya. Esto es
+        -- solo para ajustar cuánto habla.
+        -- ------------------------------------------------------------------
+        notifier = {
+            minSeverity = "warning",  -- info | warning | critical
+            cooldown = 120,           -- segundos antes de repetir la misma alerta
+            maxPerMinute = 6,         -- techo global, para que una tormenta no inunde el chat
+            speaker = { minSeverity = "critical" },
+        },
+
         power = {
             lowPercentage = 0.25,
             criticalPercentage = 0.10,

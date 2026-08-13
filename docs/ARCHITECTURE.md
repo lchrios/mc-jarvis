@@ -20,6 +20,7 @@ installer.lua            Trae updater.lua a un ordenador vacío y lo ejecuta
 updater.lua              Comprueba GitHub, avisa y actualiza solo lo que cambió
 version.lua              Imprime la versión instalada (sin red)
 scan.lua                 Diagnóstico de periféricos (sin red, sin BaseOS)
+probe.lua                Ejercita Advanced Peripherals y dice qué responde
 baseos.version           Versión instalada (la leen startup.lua y el updater)
 config/                  Configuración (sin código de lógica)
   system.lua             Nombre, logging, UI, intervalos
@@ -47,6 +48,7 @@ src/
     inventory.lua        Inventarios genéricos
     energy.lua           Almacenamiento de energía genérico
     fluid.lua            Tanques genéricos
+    speaker.lua          Altavoz (CC vanilla, verificado)
     ae2.lua              ME Bridge / RS Bridge (sin verificar en juego)
     powah.lua            Powah (extras sobre energy, sin verificar)
     advanced_peripherals.lua  Player/Environment Detector, Chat Box, etc.
@@ -56,6 +58,8 @@ src/
     power.lua            Energía agregada
     storage.lua          Almacenamiento (red o inventarios)
     demo_farm.lua        Granja simulada para validar la UI
+    presence.lua         Detección de jugadores y activación por proximidad
+    notifier.lua         Alertas al chat y al altavoz
     farm.lua             Plantilla de granja real (instancias por config)
     remote.lua           Proxy de un módulo que corre en otro ordenador
   ui/
