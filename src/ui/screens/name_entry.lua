@@ -24,7 +24,7 @@ local ROWS = {
     "ABCDEFGHIJ",
     "KLMNOPQRST",
     "UVWXYZ_012",
-    "3456789",
+    "3456789.",
 }
 
 local MAX_LENGTH = 24

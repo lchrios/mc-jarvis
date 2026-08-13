@@ -76,6 +76,7 @@ src/
     components/          label, button, panel, progress_bar, list, modal,
                          pager, zone_tile
     screens/             dashboard, base_map, layout_editor, security,
+                         rules_list, rule_edit, chooser,
                          name_entry, module_detail,
                          metric_detail,
                          module_list, alerts, peripherals, logs, nodes,
@@ -392,6 +393,38 @@ cada poll e inunda el log. `modules/demo_farm.lua` y `modules/power.lua`
 muestran el patrón (levantar al 90%, limpiar al 80%).
 
 ---
+
+## 10.a Reglas
+
+`services/rules.lua` es una máquina de dos estados por regla, no un temporizador:
+entra con `when`, sale con `until_` **o** con `after`, lo que ocurra primero. No
+guarda nada entre reinicios a propósito — al arrancar simplemente vuelve a
+evaluar las condiciones, así que un corte de luz no deja reglas a medias.
+
+Las condiciones son **tablas, no un mini-lenguaje**: tienen que poder editarse
+desde un monitor táctil, y un parser haría eso mucho más difícil. Por eso el
+editor puede construirlas eligiendo de listas.
+
+De dónde salen las reglas vigentes, en este orden:
+
+| Origen | Fichero | Quién escribe |
+| --- | --- | --- |
+| Editor | `data/rules.dat` | La pantalla RULES |
+| Config | `config/rules.lua` | Tú, a mano |
+
+Es el mismo patrón que el plano de la base: `rules.current()` devuelve el
+override si existe y si no la config, siempre **copiado**, porque el editor
+muta lo que recibe. `rules.save()` persiste y llama a `reload()`, que
+re-arma el motor en caliente; `resetToConfig()` borra el override.
+
+El scheduler se engancha de forma perezosa (`arm()`): un ordenador puede
+arrancar sin ninguna regla y recibir la primera desde el editor sin reiniciar.
+
+Una acción invocada por el motor marca una bandera mientras corre, y así
+`module.action` distingue "lo hice yo" de "lo hizo una persona". Si fue una
+persona, la regla que tuviera cogido ese módulo se suelta y queda `yielded`
+hasta que su condición de entrada deje de cumplirse — si no, te desharía el
+cambio dos segundos después.
 
 ## 10.b Identidad y roles
 

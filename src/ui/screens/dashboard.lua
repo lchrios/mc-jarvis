@@ -191,6 +191,7 @@ function Dashboard:actionSpecs()
         { label = "MAP", screen = "map" },
         { label = "NODES", screen = "nodes" },
         { label = "ALERTS", screen = "alerts" },
+        { label = "RULES", screen = "rules" },
         { label = "DEVICES", screen = "peripherals" },
         { label = "LOGS", screen = "logs" },
     }

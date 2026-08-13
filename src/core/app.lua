@@ -123,6 +123,15 @@ local function registerScreens()
     navigation.register("name_entry", function(params)
         return require("ui.screens.name_entry").new(params)
     end)
+    navigation.register("chooser", function(params)
+        return require("ui.screens.chooser").new(params)
+    end)
+    navigation.register("rules", function(params)
+        return require("ui.screens.rules_list").new(params)
+    end)
+    navigation.register("rule_edit", function(params)
+        return require("ui.screens.rule_edit").new(params)
+    end)
 end
 
 --- Footer segments: overall status, power (when the module exists) and alerts.

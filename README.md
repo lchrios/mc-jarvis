@@ -214,6 +214,56 @@ mundo, jugadores conectados, alertas activas y nodos caídos; se combinan con
 intervenir hasta que su condición de entrada deje de cumplirse y vuelva a
 cumplirse. Así no te pelea por el interruptor.
 
+### El set base
+
+BaseOS trae siete reglas hechas — granja atascada, energía crítica, base vacía,
+celdas AE2 llenas, nodo caído, turno de noche y red de almacenamiento caída —
+**todas apagadas**. Están ahí como punto de partida, no como comportamiento que
+te aparece sin pedirlo. Una regla que apunte a un módulo que no tienes no hace
+nada y lo avisa una vez en el log, no en cada ciclo.
+
+> El updater **nunca pisa `config/`**, así que en una instalación que ya existía
+> sigue estando tu `config/rules.lua` de antes. Para traerte el set base:
+> `delete config/rules.lua` y luego `updater force`.
+
+### Editarlas desde el panel
+
+Botón **RULES** en el dashboard. La lista dice qué hace cada una ahora mismo:
+
+| Estado | Significa |
+| --- | --- |
+| `off` | Apagada |
+| `waiting` | Encendida, esperando su condición |
+| `ACTING 12s` | Actuando, y le quedan 12s de `after` |
+| `yielded` | Alguien tocó el botón a mano; espera a re-armarse |
+| `ERROR` | La regla falló; el motivo está en el log |
+
+`TURN ON`/`TURN OFF` la enciende o apaga, `EDIT` la abre, `NEW` crea una y
+`RESET` tira todo lo editado y vuelve al fichero de config.
+
+El editor enseña los cinco campos como frases, no como Lua:
+
+```
+WHEN     demo_farm.buffer >= 0.9
+DO       demo_farm.stop
+UNTIL    demo_farm.buffer <= 0.3
+AFTER    60s
+THEN     demo_farm.start
+```
+
+Tocas un campo y te va preguntando: módulo → métrica → comparación → valor. Solo
+salen los módulos cargados y las métricas que existen, así que no hay forma de
+escribir un nombre mal. El valor se teclea en el mismo teclado en pantalla de la
+pantalla de accesos. `AFTER` es una lista de duraciones, y se puede dejar sin
+poner: entonces la regla solo sale por su condición.
+
+Nada se guarda hasta `SAVE`, y al salir con cambios sin guardar te pregunta.
+
+Lo editado va a `data/rules.dat` y manda sobre `config/rules.lua`, que **no se
+toca nunca** — igual que el plano del editor. `RESET` borra el override y el
+fichero vuelve a mandar. El motor recoge los cambios al momento: no hace falta
+reiniciar el ordenador para que una regla recién encendida empiece a actuar.
+
 ## Copias de seguridad
 
 `updater` devuelve los programas; lo que no se puede volver a descargar es lo
@@ -273,6 +323,9 @@ la config por defecto.
   jugador, con radio, filtro por jugador, retardo de cierre y control manual.
 * Módulo `notifier`: manda las alertas al Chat Box y al altavoz, con límite de
   ritmo para que una alerta que oscila no inunde el chat.
+* Motor de reglas con salida por condición **o** por tiempo, set base de siete
+  reglas apagadas y editor en pantalla para encenderlas y ajustarlas sin tocar
+  ficheros.
 
 ## Configuración
 
@@ -403,6 +456,11 @@ API de CC:Tweaked mockeada. Falla si el log contiene algún `[ERROR]`.
 
 ## Estado
 
-Primera fase completa y ejecutable. Pendiente (fase dos): integraciones reales
-con ME Bridge, Powah, Player/Environment Detector y Chat Box, nodos rednet
-distribuidos, histórico de métricas y automatizaciones por umbral y horario.
+Primera fase completa y ejecutable, con histórico de métricas, nodos rednet,
+perfiles de seguridad, copias de seguridad y automatizaciones editables desde el
+panel.
+
+Lo que sigue sin verificarse **dentro del juego** son las integraciones reales
+con ME Bridge, Powah y Chat Box, y el rednet entre dos ordenadores (etapas 4 y 5
+de `docs/HARDWARE.md`). Los adaptadores están escritos contra los métodos reales
+de los jars, pero eso no es lo mismo que haberlo visto funcionar.

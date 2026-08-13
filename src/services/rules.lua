@@ -29,10 +29,15 @@ local util = require("core.util")
 local logger = require("core.logger")
 local bus = require("core.event_bus")
 local state = require("core.state")
+local persistence = require("services.persistence")
 
 local log = logger.scoped("rules")
 
 local rules = {}
+
+--- Rules edited on screen live here; `config/rules.lua` stays hand-editable,
+--- exactly like the base plan.
+rules.STORE = "rules"
 
 local settings = {
     enabled = true,
@@ -43,6 +48,7 @@ local context = nil
 local definitions = {}  -- ordered rule definitions
 local runtime = {}      -- [id] = { phase, enteredAt, exitAt, yielded, fired }
 local acting = false    -- true while the engine is the one invoking an action
+local armed = false     -- the tick and the listeners are wired
 
 ---------------------------------------------------------------------------
 -- Durations
@@ -335,6 +341,28 @@ local function recordFor(id)
     return runtime[id]
 end
 
+--- Does the module this action names actually exist?
+-- A preset pointed at a machine you do not have would otherwise warn on every
+-- tick; better to say it once and skip.
+local function actionable(rule, action)
+    if type(action) == "string" then
+        local moduleId = action:match("^(.-)%.")
+        if moduleId and not context.modules.has(moduleId) then
+            if not rule.__warned then
+                log.warn("rule '%s' refers to '%s', which is not loaded here",
+                    rule.id, moduleId)
+                rule.__warned = true
+            end
+            return false
+        end
+    elseif type(action) == "table" and #action > 0 then
+        for _, child in ipairs(action) do
+            if not actionable(rule, child) then return false end
+        end
+    end
+    return true
+end
+
 --- Which modules a rule touches, so a manual press can release it.
 local function modulesOf(action, into)
     into = into or {}
@@ -348,6 +376,7 @@ local function modulesOf(action, into)
 end
 
 local function enter(rule, record)
+    if not actionable(rule, rule.do_) then return end
     record.phase = "acting"
     record.enteredAt = util.nowMs()
     record.fired = (record.fired or 0) + 1
@@ -439,6 +468,23 @@ local function onManualAction(payload)
     end
 end
 
+--- Wire the tick and the listeners, once.
+-- Separate from `start` because a base can boot with no rules at all and then
+-- get its first one from the editor; without this the engine would sit there
+-- unscheduled until the next reboot.
+local function arm()
+    if armed or not context or not settings.enabled then return false end
+    if #definitions == 0 then return false end
+
+    armed = true
+    bus.on("module.action", onManualAction, { owner = "rules" })
+    context.scheduler.every(settings.interval, rules.tick,
+        { name = "rules.tick", owner = "rules" })
+
+    log.info("rules on: %d rule(s), every %.1fs", #definitions, settings.interval)
+    return true
+end
+
 ---------------------------------------------------------------------------
 -- Inspection
 ---------------------------------------------------------------------------
@@ -479,11 +525,85 @@ end
 
 function rules.definitions() return definitions end
 
+--- Turn a rule on or off, and remember it.
 function rules.setEnabled(id, enabled)
-    local rule = rules.get(id)
-    if not rule then return false end
-    rule.enabled = enabled and true or false
-    if not rule.enabled and runtime[id] then runtime[id].phase = "idle" end
+    local list = rules.current()
+    local found = false
+
+    for _, rule in ipairs(list) do
+        if rule.id == id then
+            rule.enabled = enabled and true or false
+            found = true
+        end
+    end
+    if not found then return false end
+
+    if not enabled and runtime[id] then runtime[id].phase = "idle" end
+    return rules.save(list)
+end
+
+---------------------------------------------------------------------------
+-- Storage
+---------------------------------------------------------------------------
+
+--- The rules in force: the edited set if there is one, else config.
+-- A copy, always: the editor mutates what it gets back, and the config table it
+-- would otherwise be handed is the live one.
+function rules.current()
+    local override = persistence.load(rules.STORE, nil)
+    if type(override) == "table" and type(override.rules) == "table" then
+        return util.deepCopy(override.rules), "editor"
+    end
+    return util.deepCopy((context and context.config.get("rules.rules", {})) or {}), "config"
+end
+
+function rules.hasOverride()
+    local _, source = rules.current()
+    return source == "editor"
+end
+
+--- Persist an edited set and apply it straight away.
+function rules.save(list)
+    if type(list) ~= "table" then return false, "a rule list is required" end
+
+    local ok, err = persistence.save(rules.STORE, {
+        savedAt = util.nowMs(),
+        rules = list,
+    })
+    if not ok then return false, err end
+
+    log.info("saved %d rule(s) from the editor", #list)
+    rules.reload()
+    bus.emit("rules.changed", { count = #list })
+    return true
+end
+
+--- Throw the edited set away and go back to config.
+function rules.resetToConfig()
+    persistence.delete(rules.STORE)
+    rules.reload()
+    bus.emit("rules.changed", { reset = true })
+    return true
+end
+
+--- Re-read the rules, keeping the engine running.
+function rules.reload()
+    if not context then return false end
+
+    local list = rules.current()
+    definitions = {}
+    for _, rule in ipairs(list) do
+        if type(rule) == "table" and rule.id then
+            definitions[#definitions + 1] = util.deepCopy(rule)
+        end
+    end
+
+    -- Drop runtime state for rules that no longer exist.
+    for id in pairs(runtime) do
+        if not rules.get(id) then runtime[id] = nil end
+    end
+
+    arm()
     rules.publish()
     return true
 end
@@ -498,36 +618,25 @@ function rules.start(ctx, options)
 
     definitions = {}
     runtime = {}
-
-    for _, rule in ipairs(ctx.config.get("rules.rules", {}) or {}) do
-        if type(rule) == "table" and rule.id then
-            definitions[#definitions + 1] = util.deepCopy(rule)
-        else
-            log.warn("ignoring a rule without an id")
-        end
-    end
-
+    armed = false
     bus.offOwner("rules")
     state.set("rules.enabled", settings.enabled)
 
-    if not settings.enabled or #definitions == 0 then
+    rules.reload()   -- arms the tick if there is anything to run
+
+    if not armed then
         log.info("rules: %s", settings.enabled and "none configured" or "disabled")
         rules.publish()
         return false
     end
 
-    bus.on("module.action", onManualAction, { owner = "rules" })
-
-    ctx.scheduler.every(settings.interval, rules.tick,
-        { name = "rules.tick", owner = "rules" })
-
-    log.info("rules on: %d rule(s), every %.1fs", #definitions, settings.interval)
     rules.publish()
     return true
 end
 
 function rules.shutdown()
     bus.offOwner("rules")
+    armed = false
 end
 
 return rules
