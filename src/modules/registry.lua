@@ -508,6 +508,17 @@ function registry.invoke(id, actionId, ...)
     local record = records[id]
     if not record then return false, "unknown module" end
 
+    -- Every action funnels through here, so this is the only place security
+    -- has to be enforced. A node trusts its master: the check belongs where
+    -- the click happened, and a node has no idea who clicked.
+    if context and context.security and context.hasUI then
+        local allowed, reason = context.security.check(id .. "." .. actionId)
+        if not allowed then
+            log.warn("refused %s.%s: %s", id, actionId, tostring(reason))
+            return false, tostring(reason)
+        end
+    end
+
     for _, action in ipairs(registry.actions(id)) do
         if action.id == actionId then
             if not action.enabled then return false, "action disabled" end

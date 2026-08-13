@@ -19,7 +19,7 @@ local log = logger.scoped("config")
 local config = {}
 
 --- Files loaded from /config, in merge order.
-config.FILES = { "system", "peripherals", "layout", "modules", "network", "theme" }
+config.FILES = { "system", "peripherals", "layout", "modules", "network", "theme", "security" }
 
 --- Built-in defaults. Anything referenced by the core must have a default here
 --- so BaseOS still boots on a computer with an empty /config directory.
@@ -107,6 +107,17 @@ local DEFAULTS = {
     theme = {
         preset = "dark",
         overrides = {},
+    },
+
+    security = {
+        -- Off by default: an update must never lock anyone out of their base.
+        enabled = false,
+        mode = "session",        -- session (badge in) | proximity
+        sessionSeconds = 60,
+        detectorRadius = 8,
+        profiles = {},
+        protect = {},
+        failOpen = true,
     },
 }
 

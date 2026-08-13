@@ -26,6 +26,7 @@ local identity = require("core.identity")
 local snapshot = require("services.snapshot")
 local history = require("services.history")
 local activity = require("services.activity")
+local security = require("services.security")
 
 local theme = require("ui.theme")
 local Renderer = require("ui.renderer")
@@ -194,6 +195,7 @@ local function buildContext(options)
         snapshot = snapshot,
         history = history,
         activity = activity,
+        security = security,
         theme = theme,
         app = app,
         identity = me,
@@ -346,6 +348,7 @@ function app.boot(options)
     -- Trends need samples, and samples come from module polls.
     history.start(context, config.get("system.history", {}))
     activity.start(context)
+    security.start(context)
 
     -- 10. UI wiring + first paint
     if uiActive then
@@ -583,6 +586,7 @@ function app.shutdown()
     pcall(telemetry.shutdown)
     pcall(history.shutdown)
     pcall(activity.shutdown)
+    pcall(security.shutdown)
     pcall(network.shutdown)
     pcall(peripheralManager.shutdown)
 

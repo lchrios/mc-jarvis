@@ -33,7 +33,14 @@ print("[2] after install: " .. count("") .. " file(s), src/=" .. count("src/")
     .. " config/=" .. count("config/"))
 assert(__TEST.files["startup.lua"], "startup.lua was not installed")
 assert(count("src/") > 40, "src/ looks incomplete")
-assert(count("config/") == 6, "config/ looks incomplete")
+-- Counted from the repo rather than hardcoded, so adding a config file does
+-- not break this test.
+local expectedConfigs = 0
+for path in pairs(__TEST.remote()) do
+    if path:sub(1, 7) == "config/" then expectedConfigs = expectedConfigs + 1 end
+end
+assert(count("config/") == expectedConfigs,
+    ("config/ looks incomplete: %d of %d"):format(count("config/"), expectedConfigs))
 assert(__TEST.files["docs/ARCHITECTURE.md"] == nil, "docs should not be installed")
 assert(__TEST.files["tools/simulator/run.js"] == nil, "tools should not be installed")
 

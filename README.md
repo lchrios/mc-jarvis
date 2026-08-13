@@ -137,6 +137,34 @@ reinicio.
 Además cada ordenador guarda una instantánea en disco cada 60 s, así que tras
 un reinicio ve sus últimos valores conocidos de inmediato.
 
+## Perfiles de seguridad
+
+No todo el mundo debería poder parar una granja. `config/security.lua` protege
+acciones por patrón (`"*.stop"`, `"power.*"`) y las asigna a perfiles.
+
+**Lo que se puede saber, y lo que no:** el evento `monitor_touch` de
+ComputerCraft trae solo `(lado, x, y)`. **No hay forma de saber quién tocó la
+pantalla.** Por eso hay dos modos:
+
+| Modo | Cómo identifica | Fuerza |
+| --- | --- | --- |
+| `session` | Clic derecho en el Player Detector: AP emite `playerClick` con tu nombre y abre una sesión corta | Identidad real |
+| `proximity` | Basta con que un jugador autorizado esté en el radio | Débil: quien esté a su lado también acciona |
+
+Con `session`, pon el detector **junto al monitor** y funciona como una tarjeta
+de acceso: lo tocas y el panel se desbloquea unos segundos.
+
+```lua
+protect  = { "*.stop", "*.start" },
+profiles = {
+    admin    = { players = { "lchrios" }, allow = { "*" } },
+    operator = { players = { "amigo" },   allow = { "*.start", "*.stop" } },
+},
+```
+
+Desactivado por defecto, y sin `protect` todo está permitido: una actualización
+nunca debe dejarte fuera de tu propia base.
+
 ## Rescatar un equipo
 
 | Comando | Qué hace |

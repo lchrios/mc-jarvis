@@ -26,6 +26,7 @@ config/                  Configuración (sin código de lógica)
   system.lua             Nombre, logging, UI, intervalos
   peripherals.lua        Alias lógicos de periféricos
   layout.lua             Mapa/plano de la base (zonas del dashboard)
+  security.lua           Perfiles de permisos (desactivado por defecto)
   modules.lua            Módulos activos y sus ajustes
   network.lua            Rednet (desactivado por defecto)
   theme.lua              Colores y caracteres de dibujo
@@ -82,6 +83,7 @@ src/
     telemetry.lua        Push de métricas nodo -> master y acciones al revés
   services/
     activity.lua         Eventos recientes para el feed del dashboard
+    security.lua         Perfiles y permisos por acción
     layout_store.lua     Plano vigente: override de data/ o config/layout.lua
     alerts.lua           Alertas activas con severidad
     persistence.lua      Guardado/carga en `data/`
