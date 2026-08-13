@@ -185,6 +185,30 @@ esa es tu llave maestra.
 Desactivado por defecto, y sin `protect` todo está permitido: una actualización
 nunca debe dejarte fuera de tu propia base.
 
+## Copias de seguridad
+
+`updater` devuelve los programas; lo que no se puede volver a descargar es lo
+que hace que un ordenador sea *ese* ordenador: su `config/`, su rol, el plano
+del editor y los usuarios registrados. Eso es lo que guarda `backup`.
+
+| Comando | Qué hace |
+| --- | --- |
+| `backup` | Guarda en un disquete (Disk Drive + Floppy) |
+| `backup local` | Copia en el propio ordenador |
+| `backup show` | Qué contiene el disquete, sin restaurar |
+| `backup restore` | Restaura desde el disquete |
+| `backup pull` | Pide su configuración al master por rednet |
+| `backup list` | En un master: de qué nodos guarda copia |
+
+Los logs y las instantáneas quedan fuera a propósito: se regeneran solos.
+
+**Los nodos mandan su copia al master automáticamente** cada 5 minutos. Si un
+nodo se destruye: pones un ordenador nuevo, `installer`, `setup` con **el mismo
+nombre**, `backup pull` y `reboot`. El master le devuelve su config y el nombre
+que acabas de darle no se pisa.
+
+Para el master en cambio hace falta un disquete — nadie guarda su copia.
+
 ## Rescatar un equipo
 
 | Comando | Qué hace |

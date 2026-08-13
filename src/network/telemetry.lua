@@ -17,6 +17,7 @@ local logger = require("core.logger")
 local bus = require("core.event_bus")
 local state = require("core.state")
 local protocol = require("network.protocol")
+local backup = require("services.backup")
 
 local log = logger.scoped("telemetry")
 
@@ -27,11 +28,17 @@ telemetry.TYPES = {
     REQUEST = "state.request",            -- master -> node, "publish now"
     COMMAND = protocol.TYPES.COMMAND,     -- master -> node, run a module action
     RESULT = protocol.TYPES.RESULT,       -- node -> master, how it went
+    BACKUP = "config.backup",             -- node -> master, keep this for me
+    BACKUP_REQUEST = "config.request",    -- anyone -> master, send mine back
+    BACKUP_RESTORE = "config.restore",    -- master -> requester, here it is
 }
 
 local settings = {
     publishInterval = 3,
     staleAfter = 15,
+    -- Seconds between a node pushing its configuration to the master. Config
+    -- changes rarely, so this is deliberately slow.
+    backupInterval = 300,
 }
 
 ---------------------------------------------------------------------------
@@ -147,6 +154,17 @@ function telemetry.startPublisher(ctx, options)
     ctx.scheduler.every(settings.publishInterval, publish,
         { name = "telemetry.publish", owner = "telemetry", immediate = true })
 
+    -- Hand the master a copy of this node's configuration, so a replacement
+    -- computer can get itself back without anyone carrying a floppy around.
+    local function pushBackup()
+        ctx.network.broadcast(telemetry.TYPES.BACKUP, {
+            node = ctx.identity.name,
+            archive = backup.create(ctx),
+        })
+    end
+    ctx.scheduler.every(settings.backupInterval, pushBackup,
+        { name = "telemetry.backup", owner = "telemetry", immediate = true })
+
     log.info("publishing every %.1fs as '%s'", settings.publishInterval, ctx.identity.name)
     return true
 end
@@ -213,6 +231,28 @@ function telemetry.startCollector(ctx, options)
 
         syncRemoteModules(ctx, snapshot)
         bus.emit("node.updated", { node = snapshot.node })
+    end)
+
+    -- Keep whatever nodes send, and hand it back when one asks for its own.
+    ctx.network.registerHandler(telemetry.TYPES.BACKUP, function(message)
+        local payload = message.payload or {}
+        if payload.node and payload.archive then
+            backup.storeRemote(payload.node, payload.archive)
+        end
+    end)
+
+    ctx.network.registerHandler(telemetry.TYPES.BACKUP_REQUEST, function(message)
+        local wanted = (message.payload or {}).node or message.source
+        local archive, err = backup.loadRemote(wanted)
+        if not archive then
+            log.warn("no backup held for '%s'", tostring(wanted))
+            ctx.network.reply(message, telemetry.TYPES.BACKUP_RESTORE,
+                { node = wanted, error = err })
+            return
+        end
+        log.info("sending the stored backup of '%s'", tostring(wanted))
+        ctx.network.reply(message, telemetry.TYPES.BACKUP_RESTORE,
+            { node = wanted, archive = archive })
     end)
 
     ctx.network.registerHandler(telemetry.TYPES.RESULT, function(message)

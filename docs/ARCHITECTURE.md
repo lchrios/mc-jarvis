@@ -20,6 +20,7 @@ installer.lua            Trae updater.lua a un ordenador vacío y lo ejecuta
 updater.lua              Comprueba GitHub, avisa y actualiza solo lo que cambió
 version.lua              Imprime la versión instalada (sin red)
 scan.lua                 Diagnóstico de periféricos (sin red, sin BaseOS)
+backup.lua               Guarda y restaura la configuración de este equipo
 probe.lua                Ejercita Advanced Peripherals y dice qué responde
 baseos.version           Versión instalada (la leen startup.lua y el updater)
 config/                  Configuración (sin código de lógica)
@@ -84,6 +85,7 @@ src/
     telemetry.lua        Push de métricas nodo -> master y acciones al revés
   services/
     activity.lua         Eventos recientes para el feed del dashboard
+    backup.lua           Archivo de configuración: disco, local y remoto
     security.lua         Perfiles y permisos por acción
     layout_store.lua     Plano vigente: override de data/ o config/layout.lua
     alerts.lua           Alertas activas con severidad
