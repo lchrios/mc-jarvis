@@ -483,7 +483,7 @@ end
 ---------------------------------------------------------------- os / events
 local queue = {}
 local processed = 0
-local MAX_EVENTS = tonumber(__MAX_EVENTS) or 300
+MAX_EVENTS = tonumber(__MAX_EVENTS) or 300
 local timerSeq = 0
 local startTime = 1700000000000
 
@@ -853,6 +853,13 @@ __TEST = {
     clearChatLog = function()
         for index = #chatLog, 1, -1 do chatLog[index] = nil end
         for index = #soundLog, 1, -1 do soundLog[index] = nil end
+    end,
+
+    --- Raise this scenario's event budget. Scenarios that need a long run say
+    --- so here rather than in the npm script: npm runs scripts through cmd.exe
+    --- on Windows, where `MAX_EVENTS=280 node ...` is a syntax error.
+    setMaxEvents = function(count)
+        MAX_EVENTS = math.max(MAX_EVENTS, count)
     end,
 
     --- Pin the monitor size, for scenarios whose subject is the layout itself

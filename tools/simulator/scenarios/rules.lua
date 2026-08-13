@@ -16,6 +16,9 @@ local function check(condition, message)
     return false
 end
 
+-- The timeout path needs real simulated seconds to elapse.
+__TEST.setMaxEvents(280)
+
 __TEST.addAdvancedPeripheral("player_detector")
 
 __TEST.files["config/modules.lua"] = [[

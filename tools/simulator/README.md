@@ -27,7 +27,7 @@ node run.js scenarios/editor.lua         # the layout editor, saved and reloaded
 node run.js scenarios/presence.lua       # proximity triggers + alert announcements
 node run.js scenarios/security.lua       # roles, badge-in sessions, enrolment
 node run.js scenarios/backup.lua         # destroy a computer and rebuild it
-MAX_EVENTS=280 node run.js scenarios/rules.lua   # automation, both exit paths
+node run.js scenarios/rules.lua          # automation, both exit paths
 node run.js scenarios/resilience.lua     # no monitor + forced alert
 node run.js scenarios/modal.lua          # confirm dialog + log viewer
 node run.js scenarios/installer.lua      # install from a fake GitHub, then boot
@@ -79,6 +79,7 @@ Drop a `.lua` file into `scenarios/`. Useful helpers exposed by the mock:
 | `__TEST.queueInput(...)` | answers handed to the next `read()` prompts |
 | `__TEST.addModem(name)` | attach a modem so networking comes up |
 | `__TEST.resizeMonitor(w, h)` | pin the monitor size for layout-sensitive scenarios |
+| `__TEST.setMaxEvents(n)` | raise this scenario's event budget |
 | `__TEST.lastSent(type)` | the last rednet message this computer sent |
 | `__TEST.receive(id, msg)` | deliver a rednet message as if a node sent it |
 | `__TEST.errors()` | failures inside scenario hooks (BaseOS would hide them) |
