@@ -111,6 +111,46 @@ run("updater.lua")
 check(__TEST.files[TARGET] == localEdit, "answering 'n' leaves the file untouched")
 check(state().sha == installed.sha, "a declined update does not move the install record")
 
+------------------------------------------------- 4.b the connection drops
+-- The case the staging directory exists for: the updater rewrites startup.lua
+-- and itself, so a download that dies halfway used to leave a computer running
+-- half of one version and half of another - the one state from which you
+-- cannot run the updater again to fix it.
+print("[4b] the connection drops mid-update")
+
+-- Two files have to change, or there is no "halfway" to be interrupted at.
+local SECOND = "src/modules/power.lua"
+remote[SECOND] = "-- upstream change\n" .. remote[SECOND]
+
+local before = {}
+for path, contents in pairs(__TEST.files) do before[path] = contents end
+
+__TEST.resetHttpCalls()
+-- One raw request is the version check, the next is the first file: so the
+-- second file is the one that dies, with a file already downloaded.
+__TEST.failDownloadsAfter(2)
+__TEST.queueInput("y")
+local survived = pcall(function() run("updater.lua") end)
+__TEST.failDownloadsAfter(nil)
+
+check(not survived, "the updater stops instead of carrying on")
+check(__TEST.httpCalls().raw >= 2,
+    "it had already downloaded a file when the connection died (raw="
+        .. __TEST.httpCalls().raw .. ")")
+-- Which of the two got through first is up to the sort order; neither may be
+-- on disk, because a half-applied update is the state with no way out.
+check(__TEST.files[TARGET] == before[TARGET], "neither file was installed")
+check(__TEST.files[SECOND] == before[SECOND], "not even the one that downloaded")
+check(__TEST.files["startup.lua"] == before["startup.lua"],
+    "and startup.lua, which it rewrites late in the run, is untouched")
+check(state().sha == installed.sha, "the install record did not move")
+
+local leftovers = 0
+for path in pairs(__TEST.files) do
+    if path:sub(1, 8) == ".update/" then leftovers = leftovers + 1 end
+end
+check(leftovers == 0, "no staged files were left behind (" .. leftovers .. ")")
+
 ---------------------------------------------------------------- 5. accepted
 print("[5] the user accepts")
 __TEST.resetHttpCalls()
@@ -118,8 +158,10 @@ __TEST.queueInput("y")
 run("updater.lua")
 
 check(__TEST.files[TARGET] == remote[TARGET], "the changed file was updated")
-check(__TEST.httpCalls().raw <= 2,
-    "only the changed file was downloaded (raw=" .. __TEST.httpCalls().raw .. ")")
+check(__TEST.files[SECOND] == remote[SECOND], "and so was the second one")
+-- Two changed files plus the version check: nothing unchanged was fetched.
+check(__TEST.httpCalls().raw <= 3,
+    "only the changed files were downloaded (raw=" .. __TEST.httpCalls().raw .. ")")
 check(state().sha ~= installed.sha, "the install record advanced")
 check(__TEST.files["config/system.lua"] == "return { name = \"MI BASE\" }\n",
     "the local config edit survived the update")

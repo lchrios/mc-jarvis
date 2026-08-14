@@ -1,14 +1,18 @@
---- Central observable state store.
+--- Central state store.
 --
 -- One tree, one way in. Nothing in BaseOS should keep long lived data in
 -- globals or module upvalues that other subsystems need to read.
 --
 --   state.set("modules.demo_farm.status", "running")
 --   state.get("modules.demo_farm.status", "unknown")
---   state.watch("modules.demo_farm", function(path, value) ... end)
+--   bus.on("state.changed", function(payload) ... end)
 --
 -- Every write publishes `state.changed` on the event bus with
--- { path = ..., value = ..., previous = ... }.
+-- { path = ..., value = ..., previous = ... }. That is the only way to be told
+-- about a change: there used to be a second, per-path watcher mechanism here as
+-- well, and in the whole project nothing ever registered one. Two ways to do
+-- the same thing, one of them dead, is worse than one - so it went. Filter by
+-- `payload.path` in a bus handler, or subscribe to `state.*`.
 
 local util = require("core.util")
 local bus = require("core.event_bus")
@@ -23,8 +27,6 @@ local tree = {
     alerts = {},      -- active alerts (managed by services.alerts)
     ui = {},          -- current screen, dirty flag helpers
 }
-
-local watchers = {}   -- { { path = "modules", fn = function } , ... }
 
 --- Read a value. `path` is a dotted string; nil returns the whole tree.
 function state.get(path, default)
@@ -43,14 +45,6 @@ function state.table(path)
 end
 
 local function notify(path, value, previous)
-    for _, watcher in ipairs(watchers) do
-        if watcher.path == "" or path == watcher.path or path:sub(1, #watcher.path + 1) == watcher.path .. "." then
-            local ok, err = pcall(watcher.fn, path, value, previous)
-            if not ok then
-                bus.emit("state.watcher_error", { path = path, error = tostring(err) })
-            end
-        end
-    end
     bus.emit("state.changed", { path = path, value = value, previous = previous })
 end
 
@@ -87,22 +81,6 @@ function state.delete(path)
     util.plant(tree, path, nil)
     notify(path, nil, previous)
     return previous
-end
-
---- Watch a subtree. The handler fires for the node and anything below it.
--- @return function unsubscribe
-function state.watch(path, fn)
-    local watcher = { path = path == nil and "" or path, fn = fn }
-    watchers[#watchers + 1] = watcher
-    return function()
-        for index, existing in ipairs(watchers) do
-            if existing == watcher then
-                table.remove(watchers, index)
-                return true
-            end
-        end
-        return false
-    end
 end
 
 --- Plain copy of a subtree, safe to hand to a UI screen or serialise.

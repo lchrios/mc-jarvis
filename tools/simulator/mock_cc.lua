@@ -68,6 +68,17 @@ function fs.delete(path)
     path = normalise(path)
     files[path] = nil
     dirs[path] = nil
+
+    -- CC deletes a directory's contents with it. Without this the mock quietly
+    -- kept children alive after their parent was gone, which is a state the
+    -- real filesystem cannot be in.
+    local prefix = path .. "/"
+    for existing in pairs(files) do
+        if existing:sub(1, #prefix) == prefix then files[existing] = nil end
+    end
+    for existing in pairs(dirs) do
+        if existing:sub(1, #prefix) == prefix then dirs[existing] = nil end
+    end
     return true
 end
 function fs.move(from, to)
@@ -764,10 +775,17 @@ local function treeResponse()
 end
 
 local httpCalls = { tree = 0, raw = 0 }
+--- Number of raw downloads to serve before pretending the connection dropped.
+local httpFailAfter = nil
 
 http = {}
 function http.get(url)
     local body
+    if httpFailAfter and httpCalls.raw >= httpFailAfter
+        and url:find("raw.githubusercontent.com", 1, true) then
+        return nil, "connection lost"
+    end
+
     if url:find("api.github.com", 1, true) and url:find("/git/trees/", 1, true) then
         httpCalls.tree = httpCalls.tree + 1
         body = treeResponse()
@@ -962,6 +980,9 @@ __TEST = {
     --- How many requests hit the fake GitHub, to prove nothing was downloaded.
     httpCalls = function() return { tree = httpCalls.tree, raw = httpCalls.raw } end,
     resetHttpCalls = function() httpCalls.tree, httpCalls.raw = 0, 0 end,
+    --- Drop the connection after `count` file downloads, to exercise what an
+    --- interrupted update leaves behind. nil restores a working network.
+    failDownloadsAfter = function(count) httpFailAfter = count end,
     --- Drive the UI by what it shows rather than by coordinates.
     ui = {
         --- The screen currently on top of the navigation stack.

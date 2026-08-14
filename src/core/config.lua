@@ -159,6 +159,30 @@ local function loadConfigFile(name, root, requireFn)
     return result
 end
 
+--- Every `config/*.lua` actually on disk, sorted.
+--
+-- `config.FILES` used to be the whole story, and forgetting to add a new file
+-- to it meant the file was ignored in complete silence - which is exactly what
+-- happened to config/notifications.lua. The list still decides the merge order;
+-- this makes sure nothing is simply not read.
+function config.discover(root)
+    local directory = (root and root ~= "") and fs.combine(root, "config") or "config"
+    if not fs.isDir(directory) then return {} end
+
+    local found = {}
+    local ok, entries = pcall(fs.list, directory)
+    if not ok then return {} end
+
+    for _, entry in ipairs(entries) do
+        local name = entry:match("^(.+)%.lua$")
+        if name and not fs.isDir(fs.combine(directory, entry)) then
+            found[#found + 1] = name
+        end
+    end
+    table.sort(found)
+    return found
+end
+
 --- Load every configuration file. Called once during boot.
 -- @param options table { root = string, require = function }
 function config.load(options)
@@ -169,7 +193,23 @@ function config.load(options)
     values = util.deepCopy(DEFAULTS)
     sourceFiles = {}
 
+    -- The listed files first, in order, because the order is what makes the
+    -- merge predictable. Then anything else actually sitting in config/.
+    local seen = {}
+    local names = {}
     for _, name in ipairs(config.FILES) do
+        seen[name] = true
+        names[#names + 1] = name
+    end
+    for _, name in ipairs(config.discover(root)) do
+        if not seen[name] then
+            seen[name] = true
+            names[#names + 1] = name
+            log.info("config/%s.lua is not in config.FILES; loading it anyway", name)
+        end
+    end
+
+    for _, name in ipairs(names) do
         local loaded = loadConfigFile(name, root, requireFn)
         if loaded then
             values[name] = util.deepMerge(values[name], loaded)

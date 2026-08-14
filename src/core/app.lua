@@ -579,6 +579,7 @@ function app.checkDisplay()
 
     if monitor and monitor.name() ~= displayName then
         log.info("switching display to %s", monitor.name())
+        local wasTerminal = displayIsTerminal
         renderer = Renderer.new(monitor, {
             name = monitor.name(),
             isMonitor = true,
@@ -586,6 +587,13 @@ function app.checkDisplay()
         })
         displayName = monitor.name()
         displayIsTerminal = false
+
+        -- Logging to the terminal was turned off when the UI took it over.
+        -- The UI has just left, so the terminal is free to be a log again -
+        -- otherwise one monitor breaking silences the terminal until reboot.
+        if wasTerminal then
+            logger.configure({ toTerminal = config.get("system.logging.toTerminal", true) })
+        end
         theme.apply({
             preset = config.get("theme.preset", "dark"),
             overrides = config.get("theme.overrides", {}),
@@ -650,6 +658,7 @@ function app.shutdown()
     pcall(history.shutdown)
     pcall(activity.shutdown)
     pcall(security.shutdown)
+    pcall(notifications.shutdown)
     pcall(rules.shutdown)
     pcall(network.shutdown)
     pcall(peripheralManager.shutdown)

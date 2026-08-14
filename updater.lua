@@ -214,26 +214,60 @@ end
 -- Applying
 ---------------------------------------------------------------------------
 
-local function apply(ref, remote, work)
-    local written = 0
+--- Everything is downloaded here before anything is installed.
+--
+-- The updater rewrites `startup.lua` and itself. Writing straight to their
+-- final places meant a connection that dropped halfway - or a player walking
+-- out of the chunk - left a computer with half of one version and half of
+-- another, which is exactly the state from which you cannot run the updater
+-- again to fix it. The network is the part that fails, so all of it happens
+-- first, into a staging directory; the install afterwards is local file moves.
+local STAGING = ".update"
+
+local function clearStaging()
+    if fs.exists(STAGING) then pcall(fs.delete, STAGING) end
+end
+
+local function stage(ref, work)
+    local fetched = 0
+    local staged = {}
 
     local function download(path)
         local url = ("https://raw.githubusercontent.com/%s/%s/%s"):format(REPO, ref, path)
-        writeFile(path, fetch(url, path))
-        written = written + 1
+        local body = fetch(url, path)
+
+        local target = fs.combine(STAGING, path)
+        writeFile(target, body)
+        staged[#staged + 1] = { from = target, to = path }
+        fetched = fetched + 1
 
         -- One status line, rewritten in place, instead of scrolling output.
         local _, y = term.getCursorPos()
         term.setCursorPos(1, y)
         term.clearLine()
-        term.write(("[%d/%d] %s"):format(written, work.total, path:sub(1, 30)))
+        term.write(("[%d/%d] %s"):format(fetched, work.total, path:sub(1, 30)))
     end
 
     for _, path in ipairs(work.new) do download(path) end
     for _, path in ipairs(work.changed) do download(path) end
 
+    return staged
+end
+
+--- Move the staged files into place. Local moves only: no network from here on.
+local function install(staged, work)
+    local written = 0
+
+    for _, entry in ipairs(staged) do
+        local dir = fs.getDir(entry.to)
+        if dir and dir ~= "" and not fs.exists(dir) then fs.makeDir(dir) end
+        if fs.exists(entry.to) then fs.delete(entry.to) end
+        fs.move(entry.from, entry.to)
+        written = written + 1
+    end
+
     for _, path in ipairs(work.removed) do
-        fs.delete(path)
+        if fs.exists(path) then fs.delete(path) end
         written = written + 1
     end
 
@@ -325,7 +359,27 @@ local function main(args)
         return
     end
 
-    local written = apply(ref, remote, work)
+    -- Download everything first. A failure in here leaves the installation
+    -- exactly as it was: nothing has been moved into place yet.
+    clearStaging()
+    local ok, staged = pcall(stage, ref, work)
+    if not ok then
+        clearStaging()
+        print("")
+        -- `fetch` already said what went wrong; this says what it cost, which
+        -- is the part worth knowing: nothing.
+        fail("The download failed. Nothing was changed - run 'updater' again.")
+    end
+
+    local installed, written = pcall(install, staged, work)
+    clearStaging()
+
+    if not installed then
+        print("")
+        printError("The update was interrupted while installing: " .. tostring(written))
+        printError("Run 'updater force' to finish it, or 'installer' to start over.")
+        error("", 0)
+    end
 
     writeState({
         ref = ref, sha = remote.sha, version = available,
