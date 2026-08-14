@@ -811,10 +811,30 @@ http.checkURL = function() return true end
 local sent = {}
 local rednetOpen = {}
 
+-- CC's `rednet.open` is a thin wrapper: it opens the computer's own id and the
+-- broadcast channel on that modem. BaseOS reads those channels back to tell
+-- "a modem is attached" from "rednet actually came up on it", so the mock has
+-- to do the same or that check has nothing to see.
+local REDNET_BROADCAST_CHANNEL = 65535
+
 rednet = {
     isOpen = function(side) return rednetOpen[side] == true end,
-    open = function(side) rednetOpen[side] = true end,
-    close = function(side) rednetOpen[side] = nil end,
+    open = function(side)
+        rednetOpen[side] = true
+        local entry = peripherals[side]
+        if entry and entry.object and entry.object.open then
+            entry.object.open(os.getComputerID())
+            entry.object.open(REDNET_BROADCAST_CHANNEL)
+        end
+    end,
+    close = function(side)
+        rednetOpen[side] = nil
+        local entry = peripherals[side]
+        if entry and entry.object and entry.object.close then
+            entry.object.close(os.getComputerID())
+            entry.object.close(REDNET_BROADCAST_CHANNEL)
+        end
+    end,
     send = function(id, message, protocol)
         sent[#sent + 1] = { target = id, message = message, protocol = protocol }
         return true
@@ -903,14 +923,20 @@ __TEST = {
     end,
 
     --- Attach a modem so networking can come up.
-    addModem = function(name, wireless)
+    --- Attach a modem. `options.remote` is the peripheral names a wired one
+    --- reports on the far side of its cable.
+    addModem = function(name, wireless, options)
+        options = options or {}
+        local open = {}
         peripherals[name or "modem_0"] = {
             types = { "modem" },
             object = {
                 isWireless = function() return wireless == true end,
-                open = function() end,
-                close = function() end,
+                open = function(channel) open[channel] = true end,
+                close = function(channel) open[channel] = nil end,
+                isOpen = function(channel) return open[channel] == true end,
                 transmit = function() end,
+                getNamesRemote = function() return options.remote or {} end,
             },
         }
     end,

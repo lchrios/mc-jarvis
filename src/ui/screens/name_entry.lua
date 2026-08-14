@@ -20,12 +20,28 @@ local theme = require("ui.theme")
 
 local NameEntry = class(Screen)
 
-local ROWS = {
-    "ABCDEFGHIJ",
-    "KLMNOPQRST",
-    "UVWXYZ_012",
-    "3456789.",
+-- QWERTY, because that is where the fingers already know the letters are.
+-- Alphabetical rows look tidier and are slower to use: nobody has ever hunted
+-- for a key by counting from A.
+local LETTERS = {
+    "QWERTYUIOP",
+    "ASDFGHJKL",
+    "ZXCVBNM_-",
 }
+
+-- ...and the digits as a numpad on the right, in the order a keyboard has
+-- them, rather than trailing off the end of the alphabet.
+local NUMPAD = {
+    "789",
+    "456",
+    "123",
+    "0.",
+}
+
+local LETTER_COLUMNS = 10
+local NUMPAD_COLUMNS = 3
+local PAD_GAP = 1        -- columns of air between the letters and the numpad
+local MIN_KEY = 3        -- narrower than this and a key is not a target
 
 local MAX_LENGTH = 24
 
@@ -73,37 +89,60 @@ function NameEntry:onLayout(x, y, w, h)
     self.valueLabel:setBounds(x, y + 1, w, 1)
     self:add(self.valueLabel)
 
-    -- Keys are sized from the widest row so the grid stays square.
-    local columns = 10
-    local keyWidth = math.max(3, math.floor(w / columns))
+    -- Does the numpad fit beside the letters, or does it have to go under them?
+    local fullColumns = LETTER_COLUMNS + PAD_GAP + NUMPAD_COLUMNS
+    local sideBySide = math.floor(w / fullColumns) >= MIN_KEY
+
+    local columns = sideBySide and fullColumns or LETTER_COLUMNS
+    local keyWidth = math.max(MIN_KEY, math.floor(w / columns))
     local keyHeight = h >= 16 and 2 or 1
     local top = y + 3
 
-    for rowIndex, row in ipairs(ROWS) do
+    local function key(character, column, row)
+        local button = Button.new({
+            label = character,
+            bracket = false,
+            onPress = function() self:append(character) end,
+        })
+        button:setBounds(x + column * keyWidth, top + row * keyHeight,
+            keyWidth - 1, keyHeight)
+        self:add(button)
+    end
+
+    for rowIndex, row in ipairs(LETTERS) do
         for index = 1, #row do
-            local character = row:sub(index, index)
-            local key = Button.new({
-                label = character,
-                bracket = false,
-                onPress = function() self:append(character) end,
-            })
-            key:setBounds(x + (index - 1) * keyWidth, top + (rowIndex - 1) * keyHeight,
-                keyWidth - 1, keyHeight)
-            self:add(key)
+            key(row:sub(index, index), index - 1, rowIndex - 1)
         end
     end
 
-    -- Controls sit on the last key row, past the digits.
-    local controlsY = top + (#ROWS - 1) * keyHeight
+    local padColumn = LETTER_COLUMNS + PAD_GAP
+    local padRow = 0
+    if not sideBySide then
+        -- Narrow monitor: the pad drops below the letters, keeping its shape.
+        padColumn = 0
+        padRow = #LETTERS
+    end
+
+    for rowIndex, row in ipairs(NUMPAD) do
+        for index = 1, #row do
+            key(row:sub(index, index), padColumn + index - 1, padRow + rowIndex - 1)
+        end
+    end
+
+    -- Controls go under everything, full width, so OK and CANCEL are never a
+    -- neighbour of a letter you were aiming for.
+    local keyRows = math.max(#LETTERS, padRow + #NUMPAD)
+    local controlsY = top + keyRows * keyHeight + 1
+
     local controls = {
-        { label = "DEL", style = "default", run = function() self:backspace() end },
+        { label = "DEL", run = function() self:backspace() end },
         { label = "OK", style = "primary", run = function() self:accept() end },
         { label = "CANCEL", style = "danger", run = function()
             self.context.navigation.back()
         end },
     }
 
-    local startColumn = #ROWS[#ROWS] + 1
+    local slots = self.context.navigation.getRenderer():distribute(x, w, #controls, 2)
     for index, control in ipairs(controls) do
         local button = Button.new({
             label = control.label,
@@ -111,14 +150,8 @@ function NameEntry:onLayout(x, y, w, h)
             bracket = false,
             onPress = control.run,
         })
-        local column = startColumn + index - 1
-        if column > columns then
-            -- Not enough room beside the digits: stack them underneath.
-            button:setBounds(x + (index - 1) * math.floor(w / 3),
-                controlsY + keyHeight + 1, math.floor(w / 3) - 1, keyHeight)
-        else
-            button:setBounds(x + (column - 1) * keyWidth, controlsY, keyWidth - 1, keyHeight)
-        end
+        button:setBounds(slots[index].offset, controlsY, slots[index].size,
+            math.max(1, math.min(keyHeight + 1, y + h - controlsY)))
         self:add(button)
     end
 end

@@ -43,6 +43,50 @@ local function moduleCount(node)
     return total
 end
 
+--- Why this computer can or cannot hear anyone, in one line.
+--
+-- An empty node list has several very different causes - networking off, no
+-- modem, a modem nobody else is on - and "No nodes have reported yet" covers
+-- all of them equally badly. This is the line that separates "nothing is wrong,
+-- nobody has spoken yet" from "this computer was never going to hear anything".
+local function networkLine()
+    if state.get("network.enabled") ~= true then
+        return "Networking is off. Run 'setup' and pick a role, or set "
+            .. "network.enabled in config/network.lua.", "statusWarn"
+    end
+
+    local status = state.get("network.status")
+    if status == "no_modem" then
+        return "No modem could be opened. Attach one to a face of this computer.",
+            "statusError"
+    end
+    if status ~= "online" then
+        return "Rednet is not up (" .. tostring(status) .. ").", "statusError"
+    end
+
+    local peers = state.get("network.peers", {})
+    local count = 0
+    local names = {}
+    for name in pairs(peers) do
+        count = count + 1
+        if #names < 3 then names[#names + 1] = name end
+    end
+
+    local signed = state.get("network.authenticated") == true
+
+    if count == 0 then
+        return ("Online as '%s', %s - but no other computer has been heard. "):format(
+            tostring(state.get("network.hostname")),
+            signed and "signed" or "UNSIGNED")
+            .. "Check the other one has a modem and the same protocol.", "statusWarn"
+    end
+
+    return ("Online as '%s', %s - hearing %d: %s"):format(
+        tostring(state.get("network.hostname")),
+        signed and "signed" or "UNSIGNED",
+        count, table.concat(names, ", ")), "statusOk"
+end
+
 local function ageOf(node)
     if not node.lastSeen or node.lastSeen == 0 then return nil end
     return (util.nowMs() - node.lastSeen) / 1000
@@ -90,12 +134,20 @@ end
 function NodesScreen:onLayout(x, y, w, h)
     local width = w - 2
 
+    -- The network's own state comes first: an empty list below it means
+    -- something completely different depending on what this line says.
+    local text, colour = networkLine()
+    self.networkLabel = Label.new({ text = util.truncate(text, width), fg = colour })
+    self.networkLabel:setBounds(x + 1, y, width, 1)
+    self.networkWidth = width
+    self:add(self.networkLabel)
+
     local header = Label.new({
         text = util.padRight("NODE", width - 20) .. util.padLeft("STATUS", 9)
             .. util.padLeft("LAST SEEN", 11),
         fg = "textDim",
     })
-    header:setBounds(x + 1, y, width, 1)
+    header:setBounds(x + 1, y + 2, width, 1)
     self:add(header)
 
     self.list = List.new({
@@ -104,12 +156,22 @@ function NodesScreen:onLayout(x, y, w, h)
         emptyText = "No nodes have reported yet.",
         onSelect = function(node) self:showNode(node) end,
     })
-    self.list:setBounds(x + 1, y + 1, width, math.max(1, h - 1))
+    self.list:setBounds(x + 1, y + 3, width, math.max(1, h - 3))
     self:add(self.list)
 end
 
 function NodesScreen:update()
     if self.list then self.list:setItems(nodeList()) end
+
+    -- Refreshed every frame, not only on relayout: a node appearing is a peer
+    -- arriving, and this is the line that says so. Left in onLayout only, it
+    -- would still be reporting "nobody has answered" while the list below it
+    -- filled up.
+    if self.networkLabel then
+        local text, colour = networkLine()
+        self.networkLabel:setText(util.truncate(text, self.networkWidth or 40))
+        self.networkLabel.fg = colour
+    end
 end
 
 return NodesScreen

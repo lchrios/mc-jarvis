@@ -240,6 +240,8 @@ Para un módulo que corre en un nodo, el id lleva el nombre del nodo delante:
 | Aparece pero no se lee | `probe` para ver qué métodos responden |
 | Un aparato de Advanced Peripherals no encaja | `probe <nombre>`; los tipos son snake_case (`player_detector`) |
 | El nodo no llega al master | `network:` en su terminal; ¿modem en los dos equipos? |
+| ¿Ve mi modem? | `DEVICES`, despliega la fila del modem: dice si es wireless o de cable y si rednet está abierto en él |
+| ¿Hay alguien más ahí fuera? | `NODES`: la primera línea dice el nombre de este equipo en la red y a cuántos oye |
 | Los nodos se ignoran entre sí | ¿El mismo `secret` en `config/network.lua` de todos? |
 | Un equipo quedó mal configurado | `setup` para cambiar el rol, `reset` para dejarlo limpio |
 

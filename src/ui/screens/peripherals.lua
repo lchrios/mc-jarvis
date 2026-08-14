@@ -32,6 +32,43 @@ local CAPABILITIES = {
     { method = "getPlayersInRange", label = "player detection" },
 }
 
+--- What a modem is and whether it is actually carrying anything.
+--
+-- Modems used to fall through every check above and report "nothing BaseOS
+-- understands", which is a lie: a modem is the one peripheral the whole
+-- multi-computer side of BaseOS runs on. The question people ask of this
+-- screen is "does it know my modem is there, and is it talking to anyone" -
+-- so answer both.
+local function modemLines(proxy)
+    if not proxy or not proxy.hasMethod("isWireless") then return nil end
+
+    local lines = {}
+    local wireless = proxy.isWireless()
+    lines[#lines + 1] = {
+        text = "is: " .. (wireless and "wireless modem" or "wired modem"),
+        fg = theme.get("statusOk"),
+    }
+
+    -- rednet listens on the computer's own id, so an open channel there is
+    -- proof that rednet came up on *this* modem rather than merely that a
+    -- modem exists.
+    local listening = proxy.hasMethod("isOpen") and proxy.isOpen(os.getComputerID())
+    lines[#lines + 1] = {
+        text = "rednet: " .. (listening and "open, listening" or "not open"),
+        fg = listening and theme.get("statusOk") or theme.get("statusWarn"),
+    }
+
+    if not wireless and proxy.hasMethod("getNamesRemote") then
+        local remote = proxy.getNamesRemote() or {}
+        lines[#lines + 1] = {
+            text = ("cable: %d peripheral(s) on the far side"):format(#remote),
+            fg = #remote > 0 and theme.get("statusOk") or theme.get("textDim"),
+        }
+    end
+
+    return lines
+end
+
 function PeripheralsScreen:init(params)
     Screen.init(self, params)
     self.title = "Devices"
@@ -67,6 +104,13 @@ local function detailLines(name, device, alias)
     end
 
     local proxy = manager.getByName(name)
+
+    local modem = modemLines(proxy)
+    if modem then
+        for _, line in ipairs(modem) do lines[#lines + 1] = line end
+        return lines
+    end
+
     local found = {}
     for _, capability in ipairs(CAPABILITIES) do
         if proxy and proxy.hasMethod(capability.method) and not found[capability.label] then

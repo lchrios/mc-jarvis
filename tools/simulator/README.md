@@ -28,6 +28,7 @@ node run.js scenarios/editor.lua         # the layout editor, saved and reloaded
 node run.js scenarios/presence.lua       # proximity triggers + alert announcements
 node run.js scenarios/security.lua       # roles, badge-in sessions, enrolment
 node run.js scenarios/backup.lua         # destroy a computer and rebuild it
+node run.js scenarios/modem.lua          # is my modem seen, and is anyone out there
 node run.js scenarios/auth.lua           # signed rednet: forgery, replay, tampering
 node run.js scenarios/hardening.lua      # atomic writes, folded text, node names, cache
 node run.js scenarios/rescan.lua         # peripherals appearing and vanishing silently
@@ -89,7 +90,7 @@ Drop a `.lua` file into `scenarios/`. Useful helpers exposed by the mock:
 | `__TEST.ui.screenName()` | which screen is on top of the stack |
 | `__TEST.injectAt(eventIndex, producer)` | deliver `producer()`'s event as the Nth event |
 | `__TEST.queueInput(...)` | answers handed to the next `read()` prompts |
-| `__TEST.addModem(name)` | attach a modem so networking comes up |
+| `__TEST.addModem(name, wireless, opts)` | attach a modem; `opts.remote` is what a wired one reaches |
 | `__TEST.resizeMonitor(w, h)` | set the monitor size; mid-run it also fires `monitor_resize` |
 | `__TEST.setMaxEvents(n)` | raise this scenario's event budget |
 | `__TEST.lastSent(type)` | the last rednet message this computer sent |

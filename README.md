@@ -446,6 +446,11 @@ y dice qué tipos reporta, cuántos métodos tiene, qué alias lo reclamó y qu�
 leer BaseOS de él — o, si no sabe leer nada, te lo dice para que corras
 `scan <nombre>`.
 
+Un **modem** también sale aquí, y dice lo que hace falta saber: si es wireless o
+de cable, si rednet está abierto **en él** (no solo que exista), y cuántos
+periféricos alcanza su cable. Para saber si hay alguien más en la red, la
+primera línea de `NODES`.
+
 **No hay que reiniciar para que aparezca un bloque nuevo.** Conectar o
 desconectar llega como evento y se atiende al instante; lo demás lo recoge el
 repaso periódico:
