@@ -40,7 +40,17 @@ local settings = {
     -- Seconds between a node pushing its configuration to the master. Config
     -- changes rarely, so this is deliberately slow.
     backupInterval = 300,
+    -- Whether to push it at all; see config/network.lua -> backup.share.
+    shareBackup = false,
 }
+
+--- The peer that says it is the master, if one has introduced itself.
+function telemetry.findMaster(ctx)
+    for name, peer in pairs(ctx.network.peers()) do
+        if peer.role == "master" then return name end
+    end
+    return nil
+end
 
 ---------------------------------------------------------------------------
 -- Node side
@@ -161,14 +171,29 @@ function telemetry.startPublisher(ctx, options)
 
     -- Hand the master a copy of this node's configuration, so a replacement
     -- computer can get itself back without anyone carrying a floppy around.
+    --
+    -- Off unless asked for, and addressed rather than broadcast. That archive
+    -- carries `data/security.dat` - the list of who may operate the base - and
+    -- rednet is plaintext, so shouting it at everyone in range every five
+    -- minutes is not a reasonable default.
     local function pushBackup()
-        ctx.network.broadcast(telemetry.TYPES.BACKUP, {
+        local master = telemetry.findMaster(ctx)
+        if not master then
+            log.debug("no master known yet; holding the configuration backup")
+            return
+        end
+        ctx.network.send(master, telemetry.TYPES.BACKUP, {
             node = ctx.identity.name,
             archive = backup.create(ctx),
         })
     end
-    ctx.scheduler.every(settings.backupInterval, pushBackup,
-        { name = "telemetry.backup", owner = "telemetry", immediate = true })
+
+    if settings.shareBackup then
+        ctx.scheduler.every(settings.backupInterval, pushBackup,
+            { name = "telemetry.backup", owner = "telemetry", immediate = true })
+    else
+        log.info("configuration backups stay local (network.backup.share is off)")
+    end
 
     log.info("publishing every %.1fs as '%s'", settings.publishInterval, ctx.identity.name)
     return true

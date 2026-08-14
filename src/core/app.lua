@@ -380,10 +380,15 @@ function app.boot(options)
 
     -- Nodes publish; masters and displays collect. Neither ever reads the
     -- other's peripherals.
+    local telemetrySettings = util.deepMerge(config.get("network.telemetry", {}), {
+        shareBackup = config.get("network.backup.share", false) == true,
+        backupInterval = config.get("network.backup.interval", 300),
+    })
+
     if uiActive then
-        telemetry.startCollector(context, config.get("network.telemetry", {}))
+        telemetry.startCollector(context, telemetrySettings)
     else
-        telemetry.startPublisher(context, config.get("network.telemetry", {}))
+        telemetry.startPublisher(context, telemetrySettings)
     end
 
     -- Trends need samples, and samples come from module polls.

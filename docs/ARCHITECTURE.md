@@ -40,7 +40,7 @@ src/
     logger.lua           Logging con niveles (terminal + fichero)
     event_bus.lua        Publicación/suscripción interna
     scheduler.lua        Tareas periódicas (un único timer real)
-    state.lua            Store central observable
+    state.lua            Store central (cambios via bus: state.changed)
     util.lua             Helpers puros (formato, tablas, tiempo)
     class.lua            Herencia mínima para componentes de UI
     identity.lua         Rol de este ordenador (data/node.dat)
@@ -84,6 +84,7 @@ src/
                          power_detail, display_view
   network/
     protocol.lua         Formato de mensaje (sobre + tipos)
+    auth.lua             Firma de mensajes con secreto compartido
     network.lua          Transporte rednet
     telemetry.lua        Push de métricas nodo -> master y acciones al revés
   services/
@@ -546,6 +547,39 @@ Además cada mensaje se republica en el bus como `network.message.<tipo>`.
 Hay latidos periódicos y detección de nodos caídos (`network.peer_lost`). Ningún
 módulo toca `rednet` directamente, así que mover un módulo a otro ordenador no
 obliga a reescribirlo.
+
+### Firma de mensajes
+
+Rednet es un medio público: cualquiera puede poner un ordenador con modem,
+escuchar el protocolo `baseos` y mandar lo que quiera — y por ahí viaja
+`command.execute`. Con `secret` puesto en `config/network.lua`, cada mensaje
+sale con un `tag` calculado sobre su contenido y el secreto, y `network.onMessage`
+tira lo que no cuadre antes de que llegue a ningún handler.
+
+Qué cubre y qué no, sin adornos:
+
+| | |
+| --- | --- |
+| Impide **falsificar** un mensaje sin el secreto | Sí — que es la amenaza real |
+| Impide **repetir** uno capturado | Sí: ventana de frescura + ids recientes |
+| Impide **leer** lo que pasa por la red | **No.** No cifra nada |
+| Es un hash criptográfico | **No.** CC no tiene crypto y un SHA-256 en Lua por mensaje no compensa en un ordenador de Minecraft |
+
+`network/auth.lua` usa solo aritmética (nada de `bit32` ni de operadores
+bitwise), porque eso es lo único que se comporta igual en Lua 5.1, 5.2 y 5.3, y
+CC varía según versión.
+
+Los dos detalles que hacen que esto funcione y no se ven a simple vista:
+
+* **La forma canónica.** `textutils.serialise` recorre las tablas con `pairs`,
+  cuyo orden Lua no promete — emisor y receptor sacarían textos distintos para
+  la misma tabla y **todas** las firmas fallarían. `auth.canonical` ordena las
+  claves.
+* **La ventana de frescura.** Una firma dice quién lo escribió, no cuándo. Sin
+  ventana, un "para las granjas" capturado se puede repetir cuando quieras.
+
+Sin secreto no se firma ni se comprueba nada, que es como estaba antes: sirve
+para un mundo en solitario. Se avisa en el log en cada arranque.
 
 ---
 

@@ -137,6 +137,26 @@ reinicio.
 Además cada ordenador guarda una instantánea en disco cada 60 s, así que tras
 un reinicio ve sus últimos valores conocidos de inmediato.
 
+## Si juegas en un servidor con gente
+
+Rednet es un medio público. Cualquiera puede poner un ordenador con modem,
+escuchar el protocolo `baseos` y mandar lo que quiera — y por ahí viajan las
+acciones remotas. **Pon un secreto en [config/network.lua](config/network.lua),
+el mismo en todos los equipos de la base:**
+
+```lua
+secret = "lo que se te ocurra, cuanto mas largo mejor",
+```
+
+A partir de ahí cada mensaje va firmado y el que no cuadre se tira, con lo que
+un desconocido no puede mandar órdenes a tus nodos. Se avisa en el log en cada
+arranque mientras no lo pongas.
+
+Lo que **no** hace: cifrar. Quien escuche sigue viendo el contenido de los
+mensajes. Por eso el envío de copias de seguridad por red viene apagado.
+
+En un mundo en solitario puedes dejarlo vacío y todo funciona igual que antes.
+
 ## Perfiles de seguridad
 
 No todo el mundo debería poder parar una granja. `config/security.lua` protege
@@ -328,10 +348,15 @@ del editor y los usuarios registrados. Eso es lo que guarda `backup`.
 
 Los logs y las instantáneas quedan fuera a propósito: se regeneran solos.
 
-**Los nodos mandan su copia al master automáticamente** cada 5 minutos. Si un
-nodo se destruye: pones un ordenador nuevo, `installer`, `setup` con **el mismo
+**Los nodos pueden mandar su copia al master** cada 5 minutos. Si un nodo se
+destruye: pones un ordenador nuevo, `installer`, `setup` con **el mismo
 nombre**, `backup pull` y `reboot`. El master le devuelve su config y el nombre
 que acabas de darle no se pisa.
+
+Viene **apagado** (`backup.share` en [config/network.lua](config/network.lua)):
+ese archivo lleva `data/security.dat` — tu lista de usuarios — y rednet no
+cifra. Enciéndelo si te fías de quien pueda estar escuchando. Cuando está
+encendido va **dirigido al master**, no en broadcast.
 
 Para el master en cambio hace falta un disquete — nadie guarda su copia.
 

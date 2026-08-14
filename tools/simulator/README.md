@@ -27,6 +27,8 @@ node run.js scenarios/editor.lua         # the layout editor, saved and reloaded
 node run.js scenarios/presence.lua       # proximity triggers + alert announcements
 node run.js scenarios/security.lua       # roles, badge-in sessions, enrolment
 node run.js scenarios/backup.lua         # destroy a computer and rebuild it
+node run.js scenarios/auth.lua           # signed rednet: forgery, replay, tampering
+node run.js scenarios/hardening.lua      # atomic writes, folded text, node names, cache
 node run.js scenarios/rescan.lua         # peripherals appearing and vanishing silently
 node run.js scenarios/notifications.lua  # what reaches the Chat Box, and what does not
 node run.js scenarios/rules.lua          # automation, both exit paths

@@ -13,6 +13,7 @@ local logger = require("core.logger")
 local bus = require("core.event_bus")
 local state = require("core.state")
 local protocol = require("network.protocol")
+local auth = require("network.auth")
 
 local log = logger.scoped("network")
 
@@ -78,8 +79,14 @@ function network.init(options)
         or os.getComputerLabel()
         or ("computer_" .. os.getComputerID())
 
+    auth.configure({
+        secret = settings.secret,
+        window = settings.authWindow,
+    })
+
     state.set("network.enabled", settings.enabled)
     state.set("network.hostname", settings.hostname)
+    state.set("network.authenticated", auth.enabled())
 
     if not settings.enabled then
         log.info("networking disabled")
@@ -100,9 +107,20 @@ function network.init(options)
 
     ready = true
     state.set("network.status", "online")
-    log.info("network ready as '%s' on protocol '%s'", settings.hostname, settings.protocol)
+    log.info("network ready as '%s' on protocol '%s', signing %s",
+        settings.hostname, settings.protocol, auth.describe())
+
+    if not auth.enabled() then
+        -- Worth saying every boot. Remote actions ride on this protocol, and
+        -- on a shared server anybody can send them.
+        log.warn("no network secret set: any computer on this protocol can run "
+            .. "actions here. Set `secret` in config/network.lua on every "
+            .. "computer of the base.")
+    end
     return true
 end
+
+function network.isAuthenticated() return auth.enabled() end
 
 function network.isReady() return ready end
 
@@ -117,6 +135,8 @@ local function transmit(message, targetId)
         log.debug("dropping '%s': network not ready", message.type)
         return false
     end
+
+    auth.sign(message)
 
     local ok, err
     if targetId then
@@ -203,6 +223,28 @@ local function touchPeer(name, computerId, message)
     state.set("network.peers", util.deepCopy(peers))
 end
 
+local rejected = { count = 0, lastAt = 0 }
+
+--- A message failed its check. Counted, and mentioned at most once a minute:
+--- a computer sending garbage in a loop must not become the log.
+function network.onRejected(message, senderId, reason)
+    rejected.count = rejected.count + 1
+    state.set("network.rejected", rejected.count)
+
+    local now = util.nowMs()
+    if now - rejected.lastAt < 60000 then return end
+    rejected.lastAt = now
+
+    log.warn("refused '%s' from computer #%s (%s); %d refused so far",
+        tostring(message.type), tostring(senderId), tostring(reason), rejected.count)
+    bus.emit("network.rejected", {
+        type = message.type, senderId = senderId,
+        reason = reason, total = rejected.count,
+    })
+end
+
+function network.rejectedCount() return rejected.count end
+
 --- Feed an incoming rednet message in.
 function network.onMessage(senderId, message, receivedProtocol)
     if receivedProtocol ~= nil and receivedProtocol ~= settings.protocol then return end
@@ -213,6 +255,15 @@ function network.onMessage(senderId, message, receivedProtocol)
         return
     end
     if not protocol.isForMe(message, settings.hostname) then return end
+
+    -- Anyone can put a computer on this protocol and send whatever they like,
+    -- and one of the things they could send is "stop the farms". A message
+    -- that cannot prove it knows the base's secret does not get to be handled.
+    local authentic, why = auth.verify(message)
+    if not authentic then
+        network.onRejected(message, senderId, why)
+        return
+    end
 
     message.__senderId = senderId
     touchPeer(message.source, senderId, message)

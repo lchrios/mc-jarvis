@@ -222,7 +222,7 @@ Para un módulo que corre en un nodo, el id lleva el nombre del nodo delante:
 | `config/modules.lua` | En el equipo que ejecuta esa granja | Al añadir una granja real |
 | `config/layout.lua` | Solo en el master | Al dibujar el plano |
 | `config/peripherals.lua` | Donde esté el periférico | Solo si hay varios del mismo tipo y quieres fijar cuál |
-| `config/network.lua` | Todos | Casi nunca: la red se enciende sola al elegir rol |
+| `config/network.lua` | Todos | El `secret` si juegas en servidor; el resto casi nunca |
 
 `data/` no se toca nunca a mano: ahí viven el rol, el log y las instantáneas.
 
@@ -240,6 +240,7 @@ Para un módulo que corre en un nodo, el id lleva el nombre del nodo delante:
 | Aparece pero no se lee | `probe` para ver qué métodos responden |
 | Un aparato de Advanced Peripherals no encaja | `probe <nombre>`; los tipos son snake_case (`player_detector`) |
 | El nodo no llega al master | `network:` en su terminal; ¿modem en los dos equipos? |
+| Los nodos se ignoran entre sí | ¿El mismo `secret` en `config/network.lua` de todos? |
 | Un equipo quedó mal configurado | `setup` para cambiar el rol, `reset` para dejarlo limpio |
 
 ```
