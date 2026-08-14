@@ -258,11 +258,25 @@ function app.boot(options)
     -- Who am I? Written once by `setup` and never touched by the updater. A
     -- computer that was never set up is a master, so single-computer installs
     -- keep working exactly as they did before roles existed.
-    me = identity.load(options.root) or identity.default()
+    local loaded, identityReason = identity.load(options.root)
+    me = loaded or identity.default()
+    me.recovered = identityReason == "recovered"
+    me.corrupt = loaded == nil and identityReason == "corrupt"
+
     -- Masters and displays draw screens; nodes are headless.
     uiActive = identity.hasUI(me)
     log.info("identity: %s '%s' (%s)", me.role, tostring(me.name),
         me.implicit and "assumed" or "configured")
+
+    if me.recovered then
+        log.warn("data/node.dat was unreadable; recovered the previous version")
+    elseif me.corrupt then
+        -- Not the same as a computer that was never set up. This one had a
+        -- role and lost it, and assuming master could put a second master on
+        -- the network - so say it loudly instead of carrying on quietly.
+        log.error("data/node.dat exists but cannot be read. Assuming master; "
+            .. "run 'setup' to restore this computer's role.")
+    end
 
     state.set("system", {
         name = config.get("system.name", "BASE CONTROL"),
@@ -380,6 +394,24 @@ function app.boot(options)
     -- announced. The notifier module is what turns these into chat.
     notifications.start(context)
     rules.start(context, config.section("rules"))
+
+    -- Now that alerts can be seen on screen and said in chat, not only logged.
+    if me.corrupt then
+        alerts.raise({
+            id = "identity.corrupt",
+            source = "system",
+            severity = "critical",
+            message = "This computer lost its role (data/node.dat unreadable). "
+                .. "Run 'setup' to restore it.",
+        })
+    elseif me.recovered then
+        alerts.raise({
+            id = "identity.recovered",
+            source = "system",
+            severity = "warning",
+            message = "data/node.dat was damaged; the previous version was recovered.",
+        })
+    end
 
     -- 10. UI wiring + first paint
     if uiActive then

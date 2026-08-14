@@ -18,6 +18,7 @@ local bus = require("core.event_bus")
 local state = require("core.state")
 local protocol = require("network.protocol")
 local backup = require("services.backup")
+local identity = require("core.identity")
 
 local log = logger.scoped("telemetry")
 
@@ -104,8 +105,12 @@ local function buildSnapshot(ctx)
                     enabled = action.enabled,
                 }
             end
-            snapshot.actions = actions
-            modules[#modules + 1] = snapshot
+
+            -- A copy with the actions on it: the snapshot is the registry's
+            -- cached table now, shared with everything else that asks.
+            local outgoing = util.deepCopy(snapshot)
+            outgoing.actions = actions
+            modules[#modules + 1] = outgoing
         end
     end
 
@@ -213,7 +218,33 @@ function telemetry.startCollector(ctx, options)
         local snapshot = message.payload
         if type(snapshot) ~= "table" or type(snapshot.node) ~= "string" then return end
 
+        -- A name with a dot in it would be filed as two nested nodes and could
+        -- never be marked offline again. Nodes validate this at setup, but the
+        -- master is talking to computers it does not control.
+        if not identity.validateName(snapshot.node) then
+            log.warn("ignoring a report from '%s': not a usable node name",
+                tostring(snapshot.node))
+            return
+        end
+
+        -- Two computers answering to the same name overwrite each other's
+        -- numbers, and the readings just look wrong rather than absent - so it
+        -- has to be said out loud.
+        local known = state.get("nodes." .. snapshot.node .. ".computerId")
+        local sender = message.__senderId
+        if known and sender and known ~= sender then
+            ctx.alerts.raise({
+                id = "node.duplicate." .. snapshot.node,
+                source = "network",
+                severity = "warning",
+                message = ("Two computers call themselves '%s' (#%s and #%s). "):format(
+                    snapshot.node, tostring(known), tostring(sender))
+                    .. "Run 'setup' on one of them.",
+            })
+        end
+
         state.patch("nodes." .. snapshot.node, {
+            computerId = sender,
             name = snapshot.node,
             role = snapshot.role,
             profile = snapshot.profile,

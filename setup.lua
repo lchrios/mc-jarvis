@@ -102,8 +102,29 @@ end
 --- it, so default to something already unique rather than the profile name.
 local function defaultName(profile)
     local label = os.getComputerLabel()
-    if label and label ~= "" then return label end
+    if label and label ~= "" then
+        local cleaned = identity.cleanName(label)
+        if cleaned ~= "" then return cleaned end
+    end
     return profile.id .. "_" .. os.getComputerID()
+end
+
+--- Ask until the answer is a name the rest of BaseOS can actually carry.
+-- The computer id is in the default, so two nodes only collide if somebody
+-- types the same name into both on purpose.
+local function askName(default)
+    while true do
+        local answer = ask("Name for this computer:", default)
+        local ok, reason = identity.validateName(answer)
+        if ok then return (answer:gsub("^%s+", ""):gsub("%s+$", "")) end
+
+        printError(reason)
+        local suggestion = identity.cleanName(answer)
+        if suggestion ~= "" and suggestion ~= answer then
+            print("Try '" .. suggestion .. "'.")
+            default = suggestion
+        end
+    end
 end
 
 --- Config written for a previous role is usually wrong for the new one.
@@ -179,7 +200,7 @@ local function main(args)
     local view = profile.role == "display" and chooseView(previous) or nil
 
     print("")
-    local name = ask("Name for this computer:", previous and previous.name or defaultName(profile))
+    local name = askName(previous and previous.name or defaultName(profile))
 
     handlePreviousConfig(previous, profile)
 

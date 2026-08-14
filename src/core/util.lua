@@ -131,9 +131,51 @@ function util.indexOf(list, value)
     return nil
 end
 
+---------------------------------------------------------------------------
+-- Text for a ComputerCraft terminal
+---------------------------------------------------------------------------
+
+-- A CC terminal draws one glyph per byte from its own character set, and Lua
+-- strings are bytes. So "í" typed as UTF-8 is two bytes: it paints two wrong
+-- glyphs, and every width calculation here - which counts bytes - comes out one
+-- short per accent, which is how a tidy column ends up ragged.
+--
+-- Rather than teach the whole UI about multi-byte text for the handful of
+-- accents Spanish needs, accented letters are folded to their plain form on the
+-- way to the screen. Config files and documentation stay written properly.
+local ACCENTS = {
+    ["\195\161"] = "a", ["\195\169"] = "e", ["\195\173"] = "i",  -- á é í
+    ["\195\179"] = "o", ["\195\186"] = "u", ["\195\188"] = "u",  -- ó ú ü
+    ["\195\177"] = "n",                                          -- ñ
+    ["\195\129"] = "A", ["\195\137"] = "E", ["\195\141"] = "I",  -- Á É Í
+    ["\195\147"] = "O", ["\195\154"] = "U", ["\195\156"] = "U",  -- Ó Ú Ü
+    ["\195\145"] = "N",                                          -- Ñ
+    ["\194\191"] = "?", ["\194\161"] = "!",                      -- ¿ ¡
+    ["\194\186"] = "o", ["\194\170"] = "a",                      -- º ª
+    ["\226\130\172"] = "E",                                      -- €
+    ["\195\167"] = "c", ["\195\135"] = "C",                      -- ç Ç
+    ["\195\160"] = "a", ["\195\168"] = "e", ["\195\172"] = "i",  -- à è ì
+    ["\195\178"] = "o", ["\195\185"] = "u",                      -- ò ù
+}
+
+--- Fold text to something a CC terminal can draw one glyph per character.
+function util.ascii(text)
+    text = tostring(text or "")
+
+    -- The overwhelmingly common case, and the one worth not paying for.
+    if not text:find("[\128-\255]") then return text end
+
+    for sequence, replacement in pairs(ACCENTS) do
+        text = text:gsub(sequence, replacement)
+    end
+
+    -- Anything still multi-byte is not something this font can show either.
+    return (text:gsub("[\128-\255]", "?"))
+end
+
 --- Shorten `text` to `width` characters, adding an ellipsis when it does not fit.
 function util.truncate(text, width)
-    text = tostring(text or "")
+    text = util.ascii(text)
     if width <= 0 then return "" end
     if #text <= width then return text end
     if width <= 3 then return text:sub(1, width) end
@@ -141,13 +183,13 @@ function util.truncate(text, width)
 end
 
 function util.padRight(text, width, fill)
-    text = tostring(text or "")
+    text = util.ascii(text)
     if #text >= width then return util.truncate(text, width) end
     return text .. string.rep(fill or " ", width - #text)
 end
 
 function util.padLeft(text, width, fill)
-    text = tostring(text or "")
+    text = util.ascii(text)
     if #text >= width then return util.truncate(text, width) end
     return string.rep(fill or " ", width - #text) .. text
 end

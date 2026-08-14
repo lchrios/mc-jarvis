@@ -87,7 +87,7 @@ return {
                 -- },
                 -- {
                 --     id = "vault",
-                --     name = "Bóveda",
+                --     name = "Boveda",
                 --     radius = 3,
                 --     players = { "lchrios" },
                 --     output = { kind = "integrator", side = "top" },

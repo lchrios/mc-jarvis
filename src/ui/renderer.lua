@@ -109,7 +109,10 @@ end
 
 --- Write text at an absolute position, clipped to the surface.
 function Renderer:write(x, y, text, fg, bg)
-    text = tostring(text or "")
+    -- The last gate before the terminal. Most text arrives already folded by
+    -- `util.truncate`/`padRight`, but a module that writes its own label should
+    -- not be able to put a two-byte character on a one-glyph-per-byte screen.
+    text = util.ascii(text)
     if text == "" then return end
     y = math.floor(y)
     x = math.floor(x)

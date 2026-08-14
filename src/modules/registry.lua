@@ -106,6 +106,11 @@ local function callModule(record, name, ...)
 end
 
 local function publish(record)
+    -- The single point every change funnels through - a poll, a status change,
+    -- an action, a peripheral appearing - which makes it the right place to
+    -- drop the cached snapshot. See `registry.snapshot`.
+    record.snapshotCache = nil
+
     state.set("modules." .. record.id, {
         id = record.id,
         name = record.name,
@@ -427,10 +432,36 @@ end
 -- Views
 ---------------------------------------------------------------------------
 
+--- Throw away a module's cached snapshot; the next reader rebuilds it.
+local function invalidate(record)
+    if record then record.snapshotCache = nil end
+end
+
+registry.invalidateSnapshot = function(id) invalidate(records[id]) end
+
 --- Flattened view of a module for the dashboard and detail screen.
+--
+-- Cached until the module's data actually changes. It used to be rebuilt on
+-- every call - calling the module's own `tile()` and `metrics()` each time -
+-- and the callers are not shy: the dashboard rebuilds one per tile per layout,
+-- and the rules engine asks for one per metric condition per tick. With a
+-- handful of rules on, that is dozens of rebuilds every couple of seconds on a
+-- computer that runs at Minecraft speed.
+--
+-- The cache is dropped by anything that can change what a module reports: a
+-- poll, a status change, an action, or its peripherals coming and going. A
+-- module whose data changes without any of those - `def.volatile`, which is
+-- what a remote proxy is - opts out entirely.
+--
+-- The table is shared, not copied - copying it would give back most of what the
+-- cache saves. Callers must treat it as read-only; `telemetry` builds its own
+-- wrapper rather than hanging fields off this one.
 function registry.snapshot(id)
     local record = records[id]
     if not record then return nil end
+    if record.snapshotCache and not record.def.volatile then
+        return record.snapshotCache
+    end
 
     local snapshot = {
         id = record.id,
@@ -466,6 +497,7 @@ function registry.snapshot(id)
         end
     end
 
+    record.snapshotCache = snapshot
     return snapshot
 end
 

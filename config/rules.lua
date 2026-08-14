@@ -46,6 +46,10 @@ return {
     --
     -- Una regla que apunte a un módulo que no tienes no hace nada y lo avisa
     -- una vez en el log, no en cada ciclo.
+    --
+    -- OJO CON LOS ACENTOS en `name` y en los mensajes: la pantalla de CC dibuja
+    -- un glifo por byte, así que se pliegan a su letra sin tilde al pintarlos
+    -- ("Energía" se ve "Energia"). En los comentarios escribe normal.
     -- ----------------------------------------------------------------------
     rules = {
         {
@@ -63,7 +67,7 @@ return {
 
         {
             id = "low_power",
-            name = "Energía crítica",
+            name = "Energia critica",
             enabled = false,
             -- Baja Y bajando: no reacciona a un pico puntual.
             when = { all = {
@@ -73,7 +77,7 @@ return {
             do_ = {
                 "demo_farm.stop",
                 { alert = { severity = "critical",
-                            message = "Energía crítica: granjas paradas" } },
+                            message = "Energia critica: granjas paradas" } },
             },
             until_ = { metric = "power.charge", op = ">=", value = 0.5 },
             then_  = { "demo_farm.start", { clearAlert = true } },
@@ -81,7 +85,7 @@ return {
 
         {
             id = "nobody_home",
-            name = "Base vacía",
+            name = "Base vacia",
             enabled = false,
             -- Nadie conectado un rato: apaga lo prescindible.
             when   = { players = { online = 0, for_ = "10m" } },
@@ -97,19 +101,19 @@ return {
             -- Antes de que la red se atasque del todo.
             when = { metric = "storage.cells", op = ">=", value = 0.9 },
             do_  = { alert = { severity = "warning",
-                               message = "Las celdas de la red están casi llenas" } },
+                               message = "Las celdas de la red estan casi llenas" } },
             until_ = { metric = "storage.cells", op = "<=", value = 0.75 },
             then_  = { clearAlert = true },
         },
 
         {
             id = "node_down",
-            name = "Nodo caído",
+            name = "Nodo caido",
             enabled = false,
             -- Cambia "power_node" por el nombre real del tuyo.
             when = { node = "power_node", online = false },
             do_  = { alert = { severity = "critical",
-                               message = "El nodo power_node dejó de reportar" } },
+                               message = "El nodo power_node dejo de reportar" } },
             until_ = { node = "power_node", online = true },
             then_  = { clearAlert = true },
         },
@@ -127,11 +131,11 @@ return {
 
         {
             id = "storage_offline",
-            name = "Red de almacenamiento caída",
+            name = "Red de almacenamiento caida",
             enabled = false,
             when = { status = "storage", is = "error" },
             do_  = { alert = { severity = "critical",
-                               message = "El bridge perdió la red" } },
+                               message = "El bridge perdio la red" } },
             until_ = { status = "storage", isNot = "error" },
             then_  = { clearAlert = true },
         },

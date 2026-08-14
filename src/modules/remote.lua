@@ -26,6 +26,12 @@ function template.create(instance)
         -- No poll: data arrives by push. The staleness check is cheap enough
         -- to ride along with the status call.
         remote = true,
+        -- ...and that is exactly why its snapshot cannot be cached. Everything
+        -- here is read straight from the state tree, which telemetry writes and
+        -- the clock ages behind the registry's back - there is no poll to hang
+        -- an invalidation on. A node going quiet has to show up on the next
+        -- read, not on the next thing that happens to publish.
+        volatile = true,
     }
 
     local statePath = "nodes." .. instance.node .. ".modules." .. instance.moduleId
