@@ -40,14 +40,20 @@ function Pager:init(options)
     self.children = { self.upButton, self.downButton }
 end
 
---- Left / middle / right thirds, derived without the renderer so touch and
---- draw can never disagree about where the buttons are.
+--- Widest an arrow gets. A third of the monitor each made the pager read as
+--- another row of actions, which is exactly what it is not: it moves the list
+--- it belongs to. Sized to its label instead, with the readout given the
+--- space between.
+Pager.BUTTON_WIDTH = 10
+
+--- Left button / readout / right button, derived without the renderer so touch
+--- and draw can never disagree about where the buttons are.
 function Pager:slots()
-    local third = math.floor(self.w / 3)
+    local button = math.min(Pager.BUTTON_WIDTH, math.max(4, math.floor(self.w / 3)))
     return {
-        { x = self.x, w = third },
-        { x = self.x + third, w = self.w - 2 * third },
-        { x = self.x + self.w - third, w = third },
+        { x = self.x, w = button },
+        { x = self.x + button, w = self.w - 2 * button },
+        { x = self.x + self.w - button, w = button },
     }
 end
 

@@ -8,15 +8,12 @@ local util = require("core.util")
 local bus = require("core.event_bus")
 local Screen = require("ui.screen")
 local Label = require("ui.components.label")
-local Button = require("ui.components.button")
 local List = require("ui.components.list")
 local Modal = require("ui.components.modal")
 local rules = require("services.rules")
 local theme = require("ui.theme")
 
 local RulesList = class(Screen)
-
-local CONTROLS_HEIGHT = 3
 
 function RulesList:init(params)
     Screen.init(self, params)
@@ -142,7 +139,7 @@ function RulesList:onLayout(x, y, w, h)
     self:add(status)
     self.message = nil
 
-    local listHeight = math.max(1, h - CONTROLS_HEIGHT - 1)
+    local listHeight = math.max(1, h - Screen.ACTION_BAR - 1)
     self.list = List.new({
         items = list,
         renderItem = function(rule)
@@ -157,15 +154,12 @@ function RulesList:onLayout(x, y, w, h)
     self.list:setBounds(x, y + 1, w, listHeight)
     self:add(self.list)
 
-    local controlsY = y + h - CONTROLS_HEIGHT
-    if controlsY <= y + 1 then return end
-
     local current
     for _, rule in ipairs(list) do
         if rule.id == self.selected then current = rule end
     end
 
-    local actions = {
+    self:actionBar(x, y, w, h, {
         {
             label = (current and current.enabled) and "TURN OFF" or "TURN ON",
             style = (current and current.enabled) and "danger" or "primary",
@@ -174,19 +168,7 @@ function RulesList:onLayout(x, y, w, h)
         { label = "EDIT", run = function() self:editSelected() end },
         { label = "NEW", run = function() self:createRule() end },
         { label = "RESET", run = function() self:resetToConfig() end },
-    }
-
-    local slots = self.context.navigation.getRenderer():distribute(x, w, #actions, 1)
-    for index, action in ipairs(actions) do
-        local button = Button.new({
-            label = action.label,
-            style = action.style,
-            bracket = false,
-            onPress = action.run,
-        })
-        button:setBounds(slots[index].offset, controlsY, slots[index].size, CONTROLS_HEIGHT)
-        self:add(button)
-    end
+    })
 end
 
 function RulesList:update()

@@ -28,7 +28,12 @@ local LayoutEditor = class(Screen)
 
 local MODES = { "MOVE", "SIZE", "LINK" }
 local LIST_WIDTH = 18
-local CONTROLS_HEIGHT = 5
+
+-- One status line, then the D-pad: up on its own row, left/down/right under it.
+-- Laid out as a cross because that is what the hand expects from four
+-- direction keys - in a row they all look alike and you have to read them.
+local CONTROLS_HEIGHT = 6
+local ARROW_W, ARROW_H = 5, 2
 
 function LayoutEditor:init(params)
     Screen.init(self, params)
@@ -333,7 +338,12 @@ function LayoutEditor:onLayout(x, y, w, h)
     statusLabel:setBounds(x, controlsY, w, 1)
     self:add(statusLabel)
 
-    -- Mode, then the four arrows that act on the selection.
+    -- Mode, then the D-pad. The pad occupies two rows: the up arrow sits over
+    -- the down arrow, with left and right either side of it.
+    local padX = x + 9
+    local topRow = controlsY + 1
+    local bottomRow = topRow + ARROW_H
+
     local modeButton = Button.new({
         label = self:mode(),
         style = "primary",
@@ -346,28 +356,33 @@ function LayoutEditor:onLayout(x, y, w, h)
             self:requestLayout()
         end,
     })
-    modeButton:setBounds(x, controlsY + 1, 8, 2)
+    -- Beside the pad rather than above it, so it reads as what the arrows do.
+    modeButton:setBounds(x, bottomRow, 8, ARROW_H)
     self:add(modeButton)
 
+    local movable = self.selectedZone ~= nil and self:mode() ~= "LINK"
+
     local arrows = {
-        { label = theme.chars.arrowLeft, dx = -1, dy = 0 },
-        { label = theme.chars.arrowDown, dx = 0, dy = 1 },
-        { label = theme.chars.arrowUp, dx = 0, dy = -1 },
-        { label = theme.chars.arrowRight, dx = 1, dy = 0 },
+        { label = theme.chars.arrowUp,    dx = 0,  dy = -1, col = 1, row = topRow },
+        { label = theme.chars.arrowLeft,  dx = -1, dy = 0,  col = 0, row = bottomRow },
+        { label = theme.chars.arrowDown,  dx = 0,  dy = 1,  col = 1, row = bottomRow },
+        { label = theme.chars.arrowRight, dx = 1,  dy = 0,  col = 2, row = bottomRow },
     }
-    local arrowWidth = 5
-    for index, arrow in ipairs(arrows) do
+    for _, arrow in ipairs(arrows) do
         local button = Button.new({
             label = arrow.label,
             bracket = false,
-            enabled = self.selectedZone ~= nil and self:mode() ~= "LINK",
+            enabled = movable,
             onPress = function() self:nudge(arrow.dx, arrow.dy) end,
         })
-        button:setBounds(x + 9 + (index - 1) * (arrowWidth + 1), controlsY + 1, arrowWidth, 2)
+        button:setBounds(padX + arrow.col * (ARROW_W + 1), arrow.row, ARROW_W, ARROW_H)
         self:add(button)
     end
 
     ---------------------------------------------------------------- actions
+    -- Far side of the row, with a gutter: these change the plan, the arrows
+    -- only move the selection, and hitting the wrong one by a column is the
+    -- kind of mistake that costs you a zone.
     local actions = {
         { label = "ADD", run = function() self:addZone() end },
         { label = "DEL", style = "danger", run = function() self:removeZone() end },
@@ -375,24 +390,41 @@ function LayoutEditor:onLayout(x, y, w, h)
         { label = "EXIT", run = function() self:exit() end },
     }
 
-    local actionsX = x + 9 + #arrows * (arrowWidth + 1) + 1
+    local padRight = padX + 3 * (ARROW_W + 1)
+    local GUTTER = 4
+    local actionsX = padRight + GUTTER
     local available = w - (actionsX - x)
-    if available < #actions * 6 then
-        -- Not enough room beside the arrows: put the actions on their own row.
-        actionsX = x
-        available = w
-    end
 
-    local slots = self.context.navigation.getRenderer():distribute(actionsX, available, #actions, 1)
-    for index, action in ipairs(actions) do
-        local button = Button.new({
-            label = action.label,
-            style = action.style,
-            bracket = false,
-            onPress = action.run,
-        })
-        button:setBounds(slots[index].offset, controlsY + 3, slots[index].size, 2)
-        self:add(button)
+    if available >= #actions * 6 then
+        -- Room beside the pad: one row of four, level with the pad's centre.
+        local slots = self.context.navigation.getRenderer()
+            :distribute(actionsX, available, #actions, 1)
+        for index, action in ipairs(actions) do
+            local button = Button.new({
+                label = action.label,
+                style = action.style,
+                bracket = false,
+                onPress = action.run,
+            })
+            button:setBounds(slots[index].offset, topRow, slots[index].size, ARROW_H * 2)
+            self:add(button)
+        end
+    else
+        -- Narrow monitor: two by two, still clear of the pad.
+        local columnWidth = math.max(6, math.floor((w - (actionsX - x)) / 2) - 1)
+        for index, action in ipairs(actions) do
+            local button = Button.new({
+                label = action.label,
+                style = action.style,
+                bracket = false,
+                onPress = action.run,
+            })
+            local column = (index - 1) % 2
+            local row = math.floor((index - 1) / 2)
+            button:setBounds(actionsX + column * (columnWidth + 1),
+                topRow + row * ARROW_H, columnWidth, ARROW_H)
+            self:add(button)
+        end
     end
 end
 

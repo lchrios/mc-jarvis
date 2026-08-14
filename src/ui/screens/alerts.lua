@@ -6,7 +6,6 @@ local bus = require("core.event_bus")
 local Screen = require("ui.screen")
 local List = require("ui.components.list")
 local Label = require("ui.components.label")
-local Button = require("ui.components.button")
 local Modal = require("ui.components.modal")
 local alerts = require("services.alerts")
 local theme = require("ui.theme")
@@ -31,14 +30,12 @@ local function renderAlert(entry)
     }
 end
 
-local CONTROLS_HEIGHT = 3
-
 function AlertsScreen:onLayout(x, y, w, h)
     local heading = Label.new({ text = "Active alerts", fg = "textDim" })
     heading:setBounds(x + 1, y, w - 2, 1)
     self:add(heading)
 
-    local listHeight = math.max(1, h - 1 - CONTROLS_HEIGHT)
+    local listHeight = math.max(1, h - 1 - Screen.ACTION_BAR)
 
     self.list = List.new({
         items = alerts.list(),
@@ -51,13 +48,11 @@ function AlertsScreen:onLayout(x, y, w, h)
 
     -- "What reaches me in chat" is the question you ask right after looking at
     -- what is on screen, so it lives here rather than in the crowded bar below.
-    local button = Button.new({
-        label = "NOTIFY",
-        bracket = false,
-        onPress = function() self.context.navigation.push("notifications") end,
+    self:actionBar(x + 1, y, w - 2, h, {
+        { label = "NOTIFY", run = function()
+            self.context.navigation.push("notifications")
+        end },
     })
-    button:setBounds(x + 1, y + h - CONTROLS_HEIGHT, w - 2, CONTROLS_HEIGHT)
-    self:add(button)
 end
 
 function AlertsScreen:showAlert(entry)

@@ -9,7 +9,6 @@ local util = require("core.util")
 local bus = require("core.event_bus")
 local Screen = require("ui.screen")
 local Label = require("ui.components.label")
-local Button = require("ui.components.button")
 local List = require("ui.components.list")
 local Modal = require("ui.components.modal")
 local notifications = require("services.notifications")
@@ -17,8 +16,6 @@ local registry = require("modules.registry")
 local theme = require("ui.theme")
 
 local NotificationsScreen = class(Screen)
-
-local CONTROLS_HEIGHT = 3
 
 function NotificationsScreen:init(params)
     Screen.init(self, params)
@@ -134,7 +131,7 @@ function NotificationsScreen:onLayout(x, y, w, h)
     self:add(status)
     self.message = nil
 
-    local listHeight = math.max(1, h - CONTROLS_HEIGHT - 1)
+    local listHeight = math.max(1, h - Screen.ACTION_BAR - 1)
     self.list = List.new({
         items = list,
         renderItem = function(topic)
@@ -149,10 +146,7 @@ function NotificationsScreen:onLayout(x, y, w, h)
     self.list:setBounds(x, y + 1, w, listHeight)
     self:add(self.list)
 
-    local controlsY = y + h - CONTROLS_HEIGHT
-    if controlsY <= y + 1 then return end
-
-    local actions = {
+    self:actionBar(x, y, w, h, {
         {
             label = (selected and selected.enabled) and "MUTE" or "ANNOUNCE",
             style = (selected and selected.enabled) and "danger" or "primary",
@@ -160,19 +154,7 @@ function NotificationsScreen:onLayout(x, y, w, h)
         },
         { label = "TEST", run = function() self:test() end },
         { label = "RESET", run = function() self:resetToConfig() end },
-    }
-
-    local slots = self.context.navigation.getRenderer():distribute(x, w, #actions, 1)
-    for index, action in ipairs(actions) do
-        local button = Button.new({
-            label = action.label,
-            style = action.style,
-            bracket = false,
-            onPress = action.run,
-        })
-        button:setBounds(slots[index].offset, controlsY, slots[index].size, CONTROLS_HEIGHT)
-        self:add(button)
-    end
+    })
 end
 
 function NotificationsScreen:update()

@@ -107,6 +107,57 @@ function Screen:handleTouch(px, py)
 end
 
 ---------------------------------------------------------------------------
+-- The bar of actions along the bottom
+---------------------------------------------------------------------------
+
+--- Rows a screen must keep clear for `Screen:actionBar`.
+-- A blank row and a rule above the buttons, then the buttons. The gap is the
+-- point: without it a list runs straight into the actions, its own pager ends
+-- up shoulder to shoulder with them, and touching "the button at the bottom"
+-- becomes a guess.
+Screen.ACTION_BAR = 5
+Screen.ACTION_BUTTONS = 3
+
+--- Lay a row of actions along the bottom of `x, y, w, h`, above a divider.
+-- @param actions list of { label, style, run, enabled }
+function Screen:actionBar(x, y, w, h, actions)
+    if #actions == 0 then return end
+
+    local Button = require("ui.components.button")
+    local Label = require("ui.components.label")
+    local theme = require("ui.theme")
+    local util = require("core.util")
+
+    local barTop = y + h - Screen.ACTION_BAR
+    if barTop <= y then return end
+
+    -- A rule rather than blank space alone: on a busy screen the eye needs
+    -- something to stop at, and one dim line is cheaper than a panel.
+    local divider = Label.new({
+        text = string.rep(theme.chars.horizontal, math.max(0, w)),
+        fg = "border",
+    })
+    divider:setBounds(x, barTop + 1, w, 1)
+    self:add(divider)
+
+    local buttonsY = barTop + 2
+    local slots = self.context.navigation.getRenderer():distribute(x, w, #actions, 2)
+
+    for index, action in ipairs(actions) do
+        local button = Button.new({
+            label = util.truncate(action.label, slots[index].size),
+            style = action.style,
+            bracket = false,
+            enabled = action.enabled ~= false,
+            onPress = action.run,
+        })
+        button:setBounds(slots[index].offset, buttonsY, slots[index].size,
+            Screen.ACTION_BUTTONS)
+        self:add(button)
+    end
+end
+
+---------------------------------------------------------------------------
 -- Modals
 ---------------------------------------------------------------------------
 

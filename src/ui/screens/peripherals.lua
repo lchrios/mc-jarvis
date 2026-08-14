@@ -11,7 +11,6 @@ local bus = require("core.event_bus")
 local Screen = require("ui.screen")
 local List = require("ui.components.list")
 local Label = require("ui.components.label")
-local Button = require("ui.components.button")
 local manager = require("peripherals.manager")
 local theme = require("ui.theme")
 
@@ -170,8 +169,7 @@ function PeripheralsScreen:onLayout(x, y, w, h)
     self:add(header)
     self.message = nil
 
-    local BUTTON_HEIGHT = 3
-    local listHeight = math.max(1, h - 1 - BUTTON_HEIGHT)
+    local listHeight = math.max(1, h - 1 - Screen.ACTION_BAR)
 
     self.list = List.new({
         items = self:buildRows(),
@@ -191,14 +189,9 @@ function PeripheralsScreen:onLayout(x, y, w, h)
 
     -- The rescan is automatic; the button is for when you just placed a modem
     -- and do not want to wait for the next pass.
-    local button = Button.new({
-        label = "RESCAN NOW",
-        style = "primary",
-        bracket = false,
-        onPress = function() self:rescan() end,
+    self:actionBar(x + 1, y, width, h, {
+        { label = "RESCAN NOW", style = "primary", run = function() self:rescan() end },
     })
-    button:setBounds(x + 1, y + h - BUTTON_HEIGHT, width, BUTTON_HEIGHT)
-    self:add(button)
 end
 
 function PeripheralsScreen:update()
