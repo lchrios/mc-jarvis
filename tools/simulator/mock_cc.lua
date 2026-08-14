@@ -889,8 +889,17 @@ __TEST = {
 
     --- Pin the monitor size, for scenarios whose subject is the layout itself
     --- and which must not change meaning with MONITOR_W/MONITOR_H.
+    --- Set the monitor size. Called before the run it just picks the size;
+    --- called while BaseOS is running it also queues `monitor_resize`, which
+    --- is what the game sends when blocks are added to a monitor. Without the
+    --- event the UI never re-laid out, so a scenario that resized mid-run was
+    --- measuring the old layout and quietly agreeing with itself.
     resizeMonitor = function(width, height)
+        local wasRunning = processed > 0
         monitor.width, monitor.height = width, height
+        if wasRunning then
+            queue[#queue + 1] = { "monitor_resize", "monitor_0" }
+        end
     end,
 
     --- Attach a modem so networking can come up.

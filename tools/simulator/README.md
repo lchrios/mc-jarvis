@@ -23,6 +23,7 @@ node run.js scenarios/setup.lua          # the setup wizard and factory reset
 MONITOR_W=57 MONITOR_H=24 node run.js scenarios/detail_scroll.lua  # metric paging
 node run.js scenarios/display.lua        # a display node pinned to one view
 node run.js scenarios/map.lua            # base map: routed links reacting to state
+node run.js scenarios/map_default.lua    # the shipped plan, on the smallest and a big monitor
 node run.js scenarios/editor.lua         # the layout editor, saved and reloaded
 node run.js scenarios/presence.lua       # proximity triggers + alert announcements
 node run.js scenarios/security.lua       # roles, badge-in sessions, enrolment
@@ -89,7 +90,7 @@ Drop a `.lua` file into `scenarios/`. Useful helpers exposed by the mock:
 | `__TEST.injectAt(eventIndex, producer)` | deliver `producer()`'s event as the Nth event |
 | `__TEST.queueInput(...)` | answers handed to the next `read()` prompts |
 | `__TEST.addModem(name)` | attach a modem so networking comes up |
-| `__TEST.resizeMonitor(w, h)` | pin the monitor size for layout-sensitive scenarios |
+| `__TEST.resizeMonitor(w, h)` | set the monitor size; mid-run it also fires `monitor_resize` |
 | `__TEST.setMaxEvents(n)` | raise this scenario's event budget |
 | `__TEST.lastSent(type)` | the last rednet message this computer sent |
 | `__TEST.receive(id, msg)` | deliver a rednet message as if a node sent it |

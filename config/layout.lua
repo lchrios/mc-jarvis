@@ -33,56 +33,93 @@ return {
     mode = "grid",
 
     -- Separación entre tiles. "auto" usa 1 en monitores pequeños y 2 en los
-    -- grandes; pon un número para fijarla.
+    -- grandes, y ensancha cuando hay tuberías para que quepa la línea.
     gap = "auto",
 
-    grid = { columns = 12, rows = 6 },
+    -- Tope de tamaño de celda. Sin esto, un monitor alto no enseña más base:
+    -- enseña las mismas salas infladas, con el nombre flotando en medio. Al
+    -- llegar al tope el plano se centra en vez de estirarse.
+    cell = { maxCellWidth = 8, maxCellHeight = 3 },
 
+    grid = { columns = 12, rows = 9 },
+
+    -- ----------------------------------------------------------------------
+    -- PLANO DE EJEMPLO
+    --
+    -- Salas de tamaños distintos a propósito: un plano se lee por la forma,
+    -- no por el texto de dentro. Esto NO es tu base — es un punto de partida
+    -- para que edites desde MAP -> EDIT, que guarda en `data/layout.dat` y no
+    -- toca este fichero.
+    --
+    -- Si un `module` no existe en este ordenador, la sala sale en gris. No
+    -- pasa nada: bórrala desde el editor o cambia el id por el tuyo.
+    --
+    -- Nombres cortos a propósito: en un monitor de 3x2 una sala son ~8
+    -- caracteres por dentro, y un nombre largo sale cortado. Si tu monitor es
+    -- grande puedes alargarlos sin problema.
+    -- ----------------------------------------------------------------------
     zones = {
+        ---------------------------------------------------------------- arriba
         {
-            id = "storage",
-            label = "STORAGE",
-            module = "storage",
-            col = 1, row = 1, colSpan = 4, rowSpan = 3,
-        },
-        {
-            id = "hub",
-            label = "CENTRAL HUB",
-            module = "system",
-            col = 5, row = 1, colSpan = 4, rowSpan = 3,
-            links = {
-                { to = "storage", kind = "items" },
-            },
-        },
-        {
-            id = "power",
-            label = "POWER",
+            id = "reactor",
+            label = "REACTOR",
             module = "power",
-            col = 9, row = 1, colSpan = 4, rowSpan = 3,
+            col = 1, row = 1, colSpan = 3, rowSpan = 4,
             links = {
                 { to = "hub", kind = "energy" },
             },
         },
         {
-            id = "farm_demo",
-            label = "DEMO FARM",
-            module = "demo_farm",
-            col = 1, row = 4, colSpan = 4, rowSpan = 3,
+            id = "baterias",
+            label = "BATERIAS",
+            col = 1, row = 5, colSpan = 3, rowSpan = 2,
             links = {
-                { to = "storage", kind = "items" },
+                { to = "reactor", kind = "energy" },
+            },
+        },
+
+        --------------------------------------------------------------- centro
+        {
+            id = "hub",
+            label = "CONTROL",
+            module = "system",
+            col = 5, row = 2, colSpan = 4, rowSpan = 4,
+            links = {
+                { to = "almacen", kind = "items" },
+            },
+        },
+
+        -------------------------------------------------------------- derecha
+        {
+            id = "almacen",
+            label = "ALMACEN",
+            module = "storage",
+            col = 10, row = 1, colSpan = 3, rowSpan = 6,
+        },
+
+        ---------------------------------------------------------------- abajo
+        {
+            id = "granja_mobs",
+            label = "MOB FARM",
+            module = "demo_farm",
+            col = 1, row = 8, colSpan = 4, rowSpan = 2,
+            links = {
+                { to = "almacen", kind = "items" },
             },
         },
         {
-            id = "modules",
-            label = "ALL MODULES",
-            screen = "module_list",
-            col = 5, row = 4, colSpan = 4, rowSpan = 3,
+            id = "granja_cultivos",
+            label = "CULTIVOS",
+            col = 6, row = 8, colSpan = 3, rowSpan = 2,
+            links = {
+                { to = "almacen", kind = "items" },
+            },
         },
         {
-            id = "alerts",
-            label = "ALERTS",
-            screen = "alerts",
-            col = 9, row = 4, colSpan = 4, rowSpan = 3,
+            id = "taller",
+            label = "TALLER",
+            screen = "module_list",
+            col = 10, row = 8, colSpan = 3, rowSpan = 2,
         },
     },
 }

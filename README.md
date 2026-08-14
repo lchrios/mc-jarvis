@@ -476,20 +476,39 @@ byRole = {
 ### El mapa de la base
 
 El plano vive en su **propia pantalla** (botón `MAP`, o como vista fija de un
-display): cajas que colocas tú y tuberías que se trazan solas.
+display): salas que colocas tú y tuberías que se trazan solas. **No es el
+dashboard otra vez** — un plano se lee por la forma, así que las salas tienen
+tamaños distintos y dentro llevan poca cosa: el nombre y una palabra de estado.
+El detalle está a un toque.
 
 ```
-+---------------+   +----------------+   +---------------+
-|    POWER      |   |  CENTRAL HUB   |   |    STORAGE    |
-|   NO DEVICE   |==>|     ONLINE     |<==|     LOCAL     |
-+---------------+   +----------------+   +---------------+
-                             ^
-                             |
-                    +----------------+
-                    |   DEMO FARM    |
-                    |    STOPPED     |
-                    +----------------+
+ +---------------+                                           +---------------+
+ |               |                                           |               |
+ |    REACTOR    |         +----------------------+          |               |
+ |   NO DEVICE   |====+    |                      |          |               |
+ |               |    |    |       CONTROL        |          |               |
+ |               |    ====>|        ONLINE        |====+     |    ALMACEN    |
+ +---------------+         |                      |=========>|   NO DEVICE   |
+         ^                 |                      |    |     |               |
+         |                 +----------------------+    |     |               |
+ +---------------+                        |            |     |               |
+ |   BATERIAS    |                        |            |     |               |
+ +---------------+                        |            |     +---------------+
+                                          |            |
+ +---------------------+          +---------------+    |     +---------------+
+ |      MOB FARM       |==========|   CULTIVOS    |====+     |    TALLER     |
+ +---------------------+          +---------------+          +---------------+
 ```
+
+Eso es lo que trae [config/layout.lua](config/layout.lua) de fábrica. **No es tu
+base**: es un punto de partida con salas de distintos tamaños para que lo edites
+desde `MAP` → `EDIT`. Una sala cuyo módulo no exista en ese ordenador sale en
+gris; bórrala o cámbiale el id.
+
+> Un monitor más alto **no infla las salas**. El plano tiene un tamaño en el que
+> se lee bien (`cell` en el config) y a partir de ahí se centra en vez de
+> estirarse — antes, cuanto más grande el monitor, más grandes las cajas y más
+> perdido el nombre en medio.
 
 Declaras la conexión, no el recorrido:
 

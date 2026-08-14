@@ -42,6 +42,33 @@ local function gridSpan(origin, total, index, span, count)
     return start, math.max(start, finish) - start + 1
 end
 
+--- The rectangle the plan is actually drawn in.
+--
+-- The grid used to be stretched over the whole content area, so a taller
+-- monitor did not show a bigger base - it showed the same rooms, inflated,
+-- with a name floating in the middle of each. A floor plan has a size that
+-- reads well; past that it should be centred, not blown up.
+--
+-- Capped by what a cell needs: enough for a border, a name and a line of
+-- state, plus a little. Width is capped much more loosely because rooms read
+-- fine wide, and a plan squeezed into a column in the middle of a wide monitor
+-- would look broken.
+local function planArea(area, columns, rows, limits)
+    limits = limits or {}
+    local maxCellH = limits.maxCellHeight or 3
+    local maxCellW = limits.maxCellWidth or 8
+
+    local width = math.min(area.w, columns * maxCellW)
+    local height = math.min(area.h, rows * maxCellH)
+
+    return {
+        x = area.x + math.floor((area.w - width) / 2),
+        y = area.y + math.floor((area.h - height) / 2),
+        w = width,
+        h = height,
+    }
+end
+
 local function normaliseZone(zone, index)
     local normalised = util.deepCopy(zone)
     normalised.id = zone.id or zone.module or ("zone" .. index)
@@ -100,7 +127,14 @@ function baseLayout.resolve(layoutConfig, area, fallbackModuleIds)
         end
     end
 
-    local gapX, gapY = resolveGap(layoutConfig.gap, area, declaresLinks(zones))
+    -- `absolute` means what it says: the coordinates are the plan, so it is not
+    -- scaled or centred.
+    local canvas = area
+    if mode == "grid" then
+        canvas = planArea(area, columns, rows, layoutConfig.cell)
+    end
+
+    local gapX, gapY = resolveGap(layoutConfig.gap, canvas, declaresLinks(zones))
 
     local placed = {}
     for index, rawZone in ipairs(zones) do
@@ -120,8 +154,8 @@ function baseLayout.resolve(layoutConfig, area, fallbackModuleIds)
             local colSpan = zone.colSpan or zone.width or 1
             local rowSpan = zone.rowSpan or zone.height or 1
 
-            local zx, zw = gridSpan(area.x, area.w, col, colSpan, columns)
-            local zy, zh = gridSpan(area.y, area.h, row, rowSpan, rows)
+            local zx, zw = gridSpan(canvas.x, canvas.w, col, colSpan, columns)
+            local zy, zh = gridSpan(canvas.y, canvas.h, row, rowSpan, rows)
             rect = { x = zx, y = zy, w = zw, h = zh }
 
             -- Breathing room between tiles, but never at the cost of legibility.

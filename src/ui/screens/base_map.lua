@@ -103,6 +103,7 @@ function BaseMap:onLayout(x, y, w, h)
         local tile = ZoneTile.new({
             zone = zone,
             snapshot = self:snapshotFor(zone),
+            compact = true,
             onPress = function() self:openZone(zone) end,
         })
         tile:setBounds(placement.x, placement.y, placement.w, placement.h)

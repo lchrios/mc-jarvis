@@ -13,13 +13,20 @@ local theme = require("ui.theme")
 
 local ZoneTile = class(Component)
 
---- @param options table { zone, snapshot, onPress }
+--- @param options table { zone, snapshot, onPress, compact }
+--
+-- `compact` is what the base map uses. A plan is read by its shape - which
+-- room is where, and what runs between them - so a tile there carries its name
+-- and one word of state and stops. Spelling out "no storage peripherals" in
+-- every box turns the plan back into the dashboard it is meant not to be; the
+-- detail is one touch away.
 function ZoneTile:init(options)
     Component.init(self, options)
     options = options or {}
     self.zone = options.zone or {}
     self.snapshot = options.snapshot or {}
     self.onPress = options.onPress
+    self.compact = options.compact == true
 end
 
 function ZoneTile:setSnapshot(snapshot)
@@ -57,17 +64,28 @@ function ZoneTile:draw(renderer)
     if self.h >= 4 then
         local statusText = snapshot.statusText or tostring(snapshot.status or "unknown"):upper()
         if not available then statusText = "N/A" end
+
+        -- On a plan a half-word like "NO DE..." is worse than no word: the
+        -- border is already drawn in the status colour, so the state is there
+        -- either way. Say it only when it fits whole.
+        local fits = not self.compact or #statusText <= innerW
+
         -- An empty status is a deliberate choice (shortcut tiles), not a gap.
-        if statusText ~= "" then
+        if statusText ~= "" and fits then
             rows[#rows + 1] = { text = statusText, fg = statusColor }
         end
     end
 
-    for _, line in ipairs(snapshot.lines or {}) do
-        rows[#rows + 1] = { text = line, fg = "textDim" }
+    if not self.compact then
+        for _, line in ipairs(snapshot.lines or {}) do
+            rows[#rows + 1] = { text = line, fg = "textDim" }
+        end
     end
 
+    -- The gauge survives compact mode: "how full is it" is a shape, not a
+    -- sentence, and it is the one number worth having on a plan.
     local showGauge = snapshot.gauge ~= nil and innerW >= 4
+        and (not self.compact or self.h >= 5)
     local needed = #rows + (showGauge and 1 or 0)
     local row = self.y + 1 + math.max(0, math.floor((innerH - needed) / 2))
     local lastRow = self.y + self.h - 2
