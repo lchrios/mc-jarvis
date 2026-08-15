@@ -8,6 +8,7 @@
 -- Actions are forwarded to the owning node; nothing is executed here.
 
 local util = require("core.util")
+local state = require("core.state")
 
 local template = {}
 
@@ -79,6 +80,20 @@ function template.create(instance)
             end,
         }
         return metrics
+    end
+
+    --- The per-device breakdown the node sent, if it sent one.
+    function remote.detail(self)
+        local snapshot = remote.snapshot(self)
+        return snapshot and snapshot.detail or nil
+    end
+
+    --- Offer the breakdown screen only when there is a breakdown to show;
+    --- anything else falls back to the generic list of metrics.
+    function remote.detailScreen(params)
+        local snapshot = state.get(statePath)
+        if not (snapshot and snapshot.detail) then return nil end
+        return require("ui.screens.power_detail").new(params)
     end
 
     function remote.tile(self)

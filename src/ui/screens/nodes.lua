@@ -156,8 +156,16 @@ function NodesScreen:onLayout(x, y, w, h)
         emptyText = "No nodes have reported yet.",
         onSelect = function(node) self:showNode(node) end,
     })
-    self.list:setBounds(x + 1, y + 3, width, math.max(1, h - 3))
+    self.list:setBounds(x + 1, y + 3, width, math.max(1, h - 3 - Screen.ACTION_BAR))
     self:add(self.list)
+
+    -- An empty list is a question about the link, not about the nodes. This is
+    -- where that question gets answered.
+    self:actionBar(x + 1, y, width, h, {
+        { label = "REDNET", style = "primary", run = function()
+            self.context.navigation.push("network", {})
+        end },
+    })
 end
 
 function NodesScreen:update()

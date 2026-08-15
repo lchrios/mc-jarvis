@@ -45,7 +45,8 @@ local displayIsTerminal = false
 local bootTime = util.nowMs()
 local context = nil
 local me = nil          -- this computer's identity
-local uiActive = false  -- false on a node: there is no UI to route touches to
+local uiActive = false  -- false on a node with no monitor: no UI to route touches to
+local isNode = false    -- a node publishes and owns its terminal, monitor or not
 
 ---------------------------------------------------------------------------
 -- Display
@@ -53,7 +54,10 @@ local uiActive = false  -- false on a node: there is no UI to route touches to
 
 --- Pick the output device: the `mainMonitor` alias, then any monitor, then the
 --- computer terminal (when `system.ui.useTerminalFallback` allows it).
-local function resolveDisplay()
+-- @param options table { allowTerminal } - a node never takes the terminal:
+--        that is where it prints its own status.
+local function resolveDisplay(options)
+    options = options or {}
     local monitor = peripheralManager.get("mainMonitor") or peripheralManager.firstOfType("monitor")
 
     if monitor then
@@ -65,6 +69,8 @@ local function resolveDisplay()
             textScale = config.get("system.ui.monitorTextScale", 0.5),
         })
     end
+
+    if options.allowTerminal == false then return nil end
 
     if config.get("system.ui.useTerminalFallback", true) then
         displayName = "terminal"
@@ -108,6 +114,9 @@ local function registerScreens()
     end)
     navigation.register("nodes", function(params)
         return require("ui.screens.nodes").new(params)
+    end)
+    navigation.register("network", function(params)
+        return require("ui.screens.network").new(params)
     end)
     navigation.register("metric_detail", function(params)
         return require("ui.screens.metric_detail").new(params)
@@ -263,8 +272,10 @@ function app.boot(options)
     me.recovered = identityReason == "recovered"
     me.corrupt = loaded == nil and identityReason == "corrupt"
 
-    -- Masters and displays draw screens; nodes are headless.
+    -- Masters and displays draw screens. A node draws too when it has a
+    -- monitor of its own (resolved below) - it publishes either way.
     uiActive = identity.hasUI(me)
+    isNode = not uiActive
     log.info("identity: %s '%s' (%s)", me.role, tostring(me.name),
         me.implicit and "assumed" or "configured")
 
@@ -306,14 +317,29 @@ function app.boot(options)
     adapters.setPeripheralManager(peripheralManager)
     adapters.load(config.get("adapters.extra", {}), options.require)
 
-    -- 6. Display. Nodes are headless: no monitor, no navigation, no touches.
-    renderer = uiActive and resolveDisplay() or nil
-    if uiActive and not renderer then
-        error("no display available: attach a monitor or enable system.ui.useTerminalFallback", 0)
+    -- 6. Display.
+    if isNode then
+        -- A node used to be headless by definition, which left the monitor
+        -- next to the energy cells showing nothing at all. If one is attached
+        -- it now gets the same view a display would draw, of this computer's
+        -- own modules. The terminal is not offered as a fallback: that is
+        -- where `printNodeStatus` reports, and it is the one place left to
+        -- look when the monitor is the thing that is wrong.
+        renderer = resolveDisplay({ allowTerminal = false })
+        uiActive = renderer ~= nil
+        if uiActive then
+            log.info("node display: %s", tostring(displayName))
+        end
+    else
+        renderer = resolveDisplay()
+        if not renderer then
+            error("no display available: attach a monitor or enable system.ui.useTerminalFallback", 0)
+        end
     end
-    -- Whoever owns the terminal - the UI fallback, or a node's status display -
+
+    -- Whoever owns the terminal - the UI fallback, or a node's status page -
     -- must not have the log scribbling over it.
-    if (renderer and displayIsTerminal) or not uiActive then
+    if (renderer and displayIsTerminal) or isNode then
         logger.configure({ toTerminal = false })
     end
 
@@ -373,6 +399,7 @@ function app.boot(options)
     local networkSettings = util.deepCopy(config.section("network"))
     networkSettings.enabled = networkSettings.enabled or not me.implicit
     networkSettings.hostname = networkSettings.hostname or me.name
+    networkSettings.role = me.role
     network.init(networkSettings)
     if network.isReady() then
         network.startHeartbeat(scheduler, me.role)
@@ -385,10 +412,12 @@ function app.boot(options)
         backupInterval = config.get("network.backup.interval", 300),
     })
 
-    if uiActive then
-        telemetry.startCollector(context, telemetrySettings)
-    else
+    -- Keyed on the role, never on whether there is a screen: a node with a
+    -- monitor is still a node, and must go on publishing.
+    if isNode then
         telemetry.startPublisher(context, telemetrySettings)
+    else
+        telemetry.startCollector(context, telemetrySettings)
     end
 
     -- Trends need samples, and samples come from module polls.
@@ -446,6 +475,15 @@ function app.boot(options)
             navigation.reset("display_view", { view = view })
         end
         app.startReturnHome(config.get("system.ui.returnHomeAfter", 60))
+    elseif isNode then
+        -- The same view a display draws, of this node's own modules: it holds
+        -- no telemetry from anybody else, so there is nothing else to show.
+        -- Touching it can still walk into the detail screens, and it comes
+        -- back on its own afterwards.
+        navigation.reset("display_view", {
+            view = me.view or { title = me.name, modules = "*" },
+        })
+        app.startReturnHome(config.get("system.ui.returnHomeAfter", 60))
     else
         navigation.reset(config.get("system.ui.homeScreen", "dashboard"), {})
     end
@@ -453,8 +491,12 @@ function app.boot(options)
     scheduler.every(config.get("system.ui.refreshInterval", 1.0), function()
         navigation.invalidate()
     end, { name = "ui.refresh", owner = "app" })
-    else
-        -- A node still owes an explanation to whoever opens its terminal.
+    end
+
+    -- A node owes an explanation to whoever opens its terminal, whether or not
+    -- it also has a monitor: the terminal is the place you look when the
+    -- monitor is blank.
+    if isNode then
         scheduler.every(3, app.printNodeStatus,
             { name = "node.status", owner = "app", immediate = true })
     end
@@ -491,7 +533,44 @@ end
 -- Node terminal
 ---------------------------------------------------------------------------
 
---- A node has no monitor, so its terminal is the only place it can report.
+--- Who is answering this node, in one line.
+function app.masterLine()
+    if not network.isReady() then return "-" end
+
+    local best, bestAge
+    for name, peer in pairs(network.peers()) do
+        local age = (util.nowMs() - (peer.lastSeen or 0)) / 1000
+        if peer.role == "master" and (not bestAge or age < bestAge) then
+            best, bestAge = name, age
+        end
+    end
+
+    if best then
+        return ("'%s', heard %s ago"):format(best, util.formatDuration(bestAge))
+    end
+
+    local peerCount = 0
+    for _ in pairs(network.peers()) do peerCount = peerCount + 1 end
+    if peerCount > 0 then
+        return ("not heard yet (%d other computer(s) are talking)"):format(peerCount)
+    end
+    return "NOT HEARD - nobody is answering on this protocol"
+end
+
+--- Messages thrown away, which is what a mismatched secret looks like.
+function app.refusedLine()
+    local stats = network.stats()
+    if (stats.rejected or 0) == 0 then return "0" end
+
+    local reasons = {}
+    for reason, count in pairs(stats.reasons or {}) do
+        reasons[#reasons + 1] = reason .. " x" .. count
+    end
+    return ("%d  (%s)  <- check `secret` matches"):format(
+        stats.rejected, table.concat(reasons, ", "))
+end
+
+--- A node's terminal is where it reports, monitor or not.
 function app.printNodeStatus()
     local target = term.native and term.native() or term
     if not target then return end
@@ -506,8 +585,15 @@ function app.printNodeStatus()
             "name:    " .. tostring(me and me.name),
             "profile: " .. tostring(me and me.profile or "custom"),
             "network: " .. (network.isReady()
-                and ("online as '" .. tostring(network.hostname()) .. "'")
+                and ("online as '" .. tostring(network.hostname()) .. "'"
+                    .. (network.isAuthenticated() and ", signed" or ", unsigned"))
                 or "OFFLINE - attach a modem"),
+            -- "The modem is open" is not the same claim as "the master can
+            -- hear me", and this page used to make only the first one. Every
+            -- question about a node that will not appear on the master is
+            -- answered by the two lines below.
+            "master:  " .. app.masterLine(),
+            "refused: " .. app.refusedLine(),
             "uptime:  " .. util.formatDuration(app.uptime()),
             "",
             "modules:",
@@ -581,6 +667,17 @@ end
 function app.checkDisplay()
     if not uiActive then return end
     local monitor = peripheralManager.get("mainMonitor") or peripheralManager.firstOfType("monitor")
+
+    -- A node that loses its monitor goes back to being headless rather than
+    -- taking over the terminal, which is its status page.
+    if isNode and not monitor then
+        log.warn("node display '%s' disappeared; back to the terminal status page",
+            tostring(displayName))
+        renderer, displayName, uiActive = nil, nil, false
+        pcall(navigation.shutdown)
+        app.printNodeStatus()
+        return
+    end
 
     if monitor and monitor.name() ~= displayName then
         log.info("switching display to %s", monitor.name())

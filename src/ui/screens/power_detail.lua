@@ -1,11 +1,14 @@
---- Power detail: totals on top, one scrollable row per device below.
+--- Totals on top, one scrollable row per device below.
 --
 -- The generic detail screen renders a flat list of metrics, which turns into a
 -- wall of gauges once a base has a dozen cells and reactors. This screen keeps
 -- the aggregate visible while the per-device breakdown scrolls underneath.
 --
--- Registered by the power module through `detailScreen`, so nothing in the core
--- knows it exists.
+-- Everything is read from the module's snapshot - its metrics for the totals,
+-- its `detail` for the devices - and never from the live module object. That is
+-- the whole reason a node's cells can be listed on the master: the snapshot is
+-- what crosses rednet, so a remote power module lands here with its breakdown
+-- intact instead of degrading to four numbers.
 
 local class = require("core.class")
 local util = require("core.util")
@@ -29,48 +32,68 @@ function PowerDetail:init(params)
     self.title = record and record.name or "Power"
 end
 
---- Live data straight from the module instance.
-function PowerDetail:data()
-    local record = registry.get(self.moduleId)
-    return (record and record.def) or {}
+--- The last snapshot: local modules rebuild it on demand, remote ones read the
+--- one their node sent.
+function PowerDetail:snapshot()
+    return registry.snapshot(self.moduleId) or {}
 end
 
-local function sourceColor(percentage)
-    if percentage <= 0.10 then return theme.get("statusError") end
-    if percentage <= 0.25 then return theme.get("statusWarn") end
+function PowerDetail:rows()
+    local detail = self:snapshot().detail
+    return (detail and detail.rows) or {}
+end
+
+--- A named metric out of the snapshot, formatted the way its owner meant it.
+function PowerDetail:metric(id)
+    for _, metric in ipairs(self:snapshot().metrics or {}) do
+        if metric.id == id then return metric end
+    end
+    return nil
+end
+
+function PowerDetail:metricText(id, fallback)
+    local metric = self:metric(id)
+    if not metric then return fallback end
+    return registry.formatMetric(metric)
+end
+
+--- The charge to draw on the gauge, as a fraction.
+function PowerDetail:charge()
+    local metric = self:metric("charge")
+    local value = metric and (metric.percent or metric.value) or nil
+    if type(value) ~= "number" then return 0 end
+    if value > 1 then value = value / 100 end
+    return util.clamp(value, 0, 1)
+end
+
+local function rowColor(row)
+    if row.status then return theme.statusColor(row.status) end
+    local percent = row.percent or 0
+    if percent <= 0.10 then return theme.get("statusError") end
+    if percent <= 0.25 then return theme.get("statusWarn") end
     return theme.get("statusOk")
 end
 
-local function renderSource(source, width)
-    local percent = util.formatPercent(source.percentage or 0)
-    local stored = util.formatNumber(source.stored or 0)
-    local right = util.padLeft(percent, 6) .. util.padLeft(stored, 9)
-    local name = util.truncate(source.name or "?", math.max(6, width - #right - 1))
+local function renderRow(row, width)
+    local percent = row.percent and util.formatPercent(row.percent) or "-"
+    local right = util.padLeft(percent, 6) .. util.padLeft(row.value or "", 9)
+    local name = util.truncate(row.name or "?", math.max(6, width - #right - 1))
 
     return {
         text = util.padRight(name, width - #right) .. right,
-        fg = sourceColor(source.percentage or 0),
+        fg = rowColor(row),
     }
 end
 
-function PowerDetail:showSource(source)
-    local lines = {
-        "Stored:   " .. util.formatNumber(source.stored or 0) .. " FE",
-        "Capacity: " .. util.formatNumber(source.capacity or 0) .. " FE",
-        "Charge:   " .. util.formatPercent(source.percentage or 0),
-    }
-    if source.rate then lines[#lines + 1] = "Transfer: " .. util.formatNumber(source.rate) .. " FE/t" end
-    if source.generation then
-        lines[#lines + 1] = "Output:   " .. util.formatNumber(source.generation) .. " FE/t"
+function PowerDetail:showRow(row)
+    local lines = {}
+    for _, field in ipairs(row.fields or {}) do
+        lines[#lines + 1] = util.padRight(field.label .. ":", 11) .. tostring(field.value)
     end
-    if source.temperature then lines[#lines + 1] = "Temp:     " .. tostring(source.temperature) end
-    if source.fuel then
-        lines[#lines + 1] = "Fuel:     " .. util.formatPercent(source.fuel.percentage or 0)
-    end
-    lines[#lines + 1] = "Adapter:  " .. tostring(source.kind or "energy")
+    if #lines == 0 then lines[1] = "No detail reported for this device." end
 
     self:openModal(Modal.new({
-        title = util.truncate(source.name or "device", 24),
+        title = util.truncate(row.name or "device", 24),
         message = table.concat(lines, "\n"),
         buttons = { { label = "CLOSE" } },
         onClose = function() self:closeModal() end,
@@ -78,7 +101,7 @@ function PowerDetail:showSource(source)
 end
 
 function PowerDetail:onLayout(x, y, w, h)
-    local data = self:data()
+    local detail = self:snapshot().detail
 
     ---------------------------------------------------------------- summary
     local summary = Panel.new({ title = "Total", bg = "background", fg = "border" })
@@ -88,7 +111,7 @@ function PowerDetail:onLayout(x, y, w, h)
     local cx, cy, cw = summary:contentBounds()
 
     self.gauge = ProgressBar.new({
-        value = data.percentage or 0,
+        value = self:charge(),
         thresholds = { warn = 0.25, critical = 0.10 },
     })
     self.gauge:setBounds(cx, cy, cw, 1)
@@ -108,43 +131,41 @@ function PowerDetail:onLayout(x, y, w, h)
     local listHeight = h - SUMMARY_HEIGHT - 1
     if listHeight < 2 then return end
 
+    local columns = (detail and detail.columns) or {}
     local header = Label.new({
         text = util.padRight("DEVICE", listWidth - 15)
-            .. util.padLeft("CHARGE", 6) .. util.padLeft("STORED", 9),
+            .. util.padLeft(columns[1] or "CHARGE", 6)
+            .. util.padLeft(columns[2] or "STORED", 9),
         fg = "textDim",
     })
     header:setBounds(x + 1, listY, listWidth, 1)
     self:add(header)
 
     self.list = List.new({
-        items = data.sources or {},
-        renderItem = function(source) return renderSource(source, listWidth) end,
-        emptyText = "No energy peripherals detected.",
-        onSelect = function(source) self:showSource(source) end,
+        items = self:rows(),
+        renderItem = function(row) return renderRow(row, listWidth) end,
+        emptyText = "No devices reported.",
+        onSelect = function(row) self:showRow(row) end,
     })
     self.list:setBounds(x + 1, listY + 1, listWidth, listHeight)
     self:add(self.list)
 end
 
 function PowerDetail:update()
-    local data = self:data()
-
-    if self.gauge then self.gauge:setValue(data.percentage or 0) end
+    if self.gauge then self.gauge:setValue(self:charge()) end
 
     if self.storedLabel then
-        self.storedLabel:setText(("%s / %s FE  across %d device(s)"):format(
-            util.formatNumber(data.stored or 0),
-            util.formatNumber(data.capacity or 0),
-            #(data.sources or {})))
+        self.storedLabel:setText(("%s / %s  across %d device(s)"):format(
+            self:metricText("stored", "?"), self:metricText("capacity", "?"), #self:rows()))
     end
 
     if self.flowLabel then
-        self.flowLabel:setText(data.throughput
-            and (util.formatNumber(data.throughput) .. " FE/t")
+        self.flowLabel:setText(self:metric("flow")
+            and self:metricText("flow", "")
             or "no flow reported")
     end
 
-    if self.list then self.list:setItems(data.sources or {}) end
+    if self.list then self.list:setItems(self:rows()) end
 end
 
 return PowerDetail

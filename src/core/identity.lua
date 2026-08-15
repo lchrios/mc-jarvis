@@ -81,6 +81,8 @@ identity.VIEWS = {
     { id = "map", title = "BASE MAP", screen = "map", description = "The base plan and its links" },
     { id = "alerts", title = "ALERTS", screen = "alerts", description = "The alert list" },
     { id = "nodes", title = "NODES", screen = "nodes", description = "Node health" },
+    { id = "network", title = "REDNET", screen = "network",
+      description = "Modems, peers and traffic" },
 }
 
 function identity.view(id)

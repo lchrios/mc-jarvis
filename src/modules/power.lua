@@ -131,6 +131,52 @@ function power.metrics(self)
     return metrics
 end
 
+--- The devices behind the totals, one row each.
+--
+-- Formatted here rather than on the screen because this is what travels: a
+-- node's cells have to be listable on the master, and the master never reads a
+-- remote peripheral. Numbers become strings on the computer that owns them.
+function power.detail(self)
+    local rows = {}
+
+    for _, source in ipairs(self.sources or {}) do
+        local fields = {
+            { label = "Stored", value = util.formatNumber(source.stored or 0) .. " FE" },
+            { label = "Capacity", value = util.formatNumber(source.capacity or 0) .. " FE" },
+            { label = "Charge", value = util.formatPercent(source.percentage or 0) },
+        }
+        if source.rate then
+            fields[#fields + 1] = { label = "Transfer",
+                value = util.formatNumber(source.rate) .. " FE/t" }
+        end
+        if source.generation then
+            fields[#fields + 1] = { label = "Output",
+                value = util.formatNumber(source.generation) .. " FE/t" }
+        end
+        if source.temperature then
+            fields[#fields + 1] = { label = "Temp", value = tostring(source.temperature) }
+        end
+        if source.fuel then
+            fields[#fields + 1] = { label = "Fuel",
+                value = util.formatPercent(source.fuel.percentage or 0) }
+        end
+        fields[#fields + 1] = { label = "Adapter", value = tostring(source.kind or "energy") }
+
+        local percentage = source.percentage or 0
+        rows[#rows + 1] = {
+            id = source.name,
+            name = source.name,
+            percent = percentage,
+            value = util.formatNumber(source.stored or 0),
+            status = (percentage <= 0.10 and "error")
+                or (percentage <= 0.25 and "warning") or "running",
+            fields = fields,
+        }
+    end
+
+    return { columns = { "CHARGE", "STORED" }, rows = rows }
+end
+
 --- Custom detail view with a scrollable device breakdown.
 function power.detailScreen(params)
     return require("ui.screens.power_detail").new(params)

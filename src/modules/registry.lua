@@ -68,6 +68,53 @@ function registry.normaliseMetrics(raw)
     return result
 end
 
+--- The per-device breakdown behind a module, normalised.
+--
+-- A module reports totals as metrics; `detail` is the list underneath - the
+-- individual cells, drives or tanks it added up. Kept to plain strings and
+-- numbers on purpose: this rides to the master over rednet, where a `format`
+-- function would not survive the trip, so the node does the formatting.
+--
+--   { columns = { "CHARGE", "STORED" },
+--     rows = { { id, name, percent, value, fields = { { label, value } } } } }
+function registry.normaliseDetail(raw)
+    if type(raw) ~= "table" then return nil end
+
+    local rawRows = raw.rows or raw
+    if type(rawRows) ~= "table" or #rawRows == 0 then return nil end
+
+    local rows = {}
+    for index, entry in ipairs(rawRows) do
+        if type(entry) == "table" then
+            local fields = {}
+            for _, field in ipairs(entry.fields or {}) do
+                if type(field) == "table" and field.label then
+                    fields[#fields + 1] = {
+                        label = tostring(field.label),
+                        value = tostring(field.value),
+                    }
+                end
+            end
+
+            rows[#rows + 1] = {
+                id = tostring(entry.id or entry.name or index),
+                name = tostring(entry.name or entry.id or ("device " .. index)),
+                percent = type(entry.percent) == "number" and entry.percent or nil,
+                value = entry.value ~= nil and tostring(entry.value) or nil,
+                status = entry.status and tostring(entry.status) or nil,
+                fields = fields,
+            }
+        end
+    end
+
+    if #rows == 0 then return nil end
+
+    local columns = {}
+    for _, column in ipairs(raw.columns or {}) do columns[#columns + 1] = tostring(column) end
+
+    return { columns = columns, rows = rows }
+end
+
 --- Human readable form of a metric entry.
 function registry.formatMetric(metric)
     if metric == nil then return "-" end
@@ -75,6 +122,9 @@ function registry.formatMetric(metric)
         local ok, text = pcall(metric.format, metric.value, metric)
         if ok and text then return tostring(text) end
     end
+    -- A metric that crossed the network carries the text its own node
+    -- produced: the function that made it could not come with it.
+    if metric.text ~= nil then return tostring(metric.text) end
 
     local value = metric.value
     if metric.kind == "percent" or (metric.percent ~= nil and value == nil) then
@@ -487,6 +537,13 @@ function registry.snapshot(id)
 
     local okMetrics, metrics = callModule(record, "metrics")
     if okMetrics then snapshot.metrics = registry.normaliseMetrics(metrics) end
+
+    -- Optional: the devices behind the totals. Every screen that shows a
+    -- breakdown reads it from here, so a remote module gets the same one.
+    if record.def.detail then
+        local okDetail, detail = callModule(record, "detail")
+        if okDetail then snapshot.detail = registry.normaliseDetail(detail) end
+    end
 
     -- Fall back to the first two metrics when the module has no custom tile.
     if #snapshot.lines == 0 then

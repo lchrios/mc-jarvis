@@ -120,6 +120,16 @@ local function buildSnapshot(ctx)
             -- cached table now, shared with everything else that asks.
             local outgoing = util.deepCopy(snapshot)
             outgoing.actions = actions
+
+            -- A `format` function cannot cross rednet, so the master used to
+            -- show a remote uptime as "8134" where the node showed "2h 15m".
+            -- The node renders its own metrics and sends the text.
+            for _, metric in ipairs(outgoing.metrics or {}) do
+                if metric.format ~= nil then
+                    metric.text = ctx.modules.formatMetric(metric)
+                    metric.format = nil
+                end
+            end
             modules[#modules + 1] = outgoing
         end
     end
