@@ -19,6 +19,7 @@ node run.js scenarios/power.lua          # many energy devices + the list pager
 node run.js scenarios/scan.lua           # the `scan` peripheral diagnostic
 node run.js scenarios/node.lua           # a headless node publishing telemetry
 node run.js scenarios/master.lua         # a master ingesting node telemetry
+node run.js scenarios/network.lua        # the rednet screen: heard, refused, traffic
 node run.js scenarios/setup.lua          # the setup wizard and factory reset
 MONITOR_W=57 MONITOR_H=24 node run.js scenarios/detail_scroll.lua  # metric paging
 node run.js scenarios/display.lua        # a display node pinned to one view
