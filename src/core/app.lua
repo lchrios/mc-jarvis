@@ -329,6 +329,8 @@ function app.boot(options)
         uiActive = renderer ~= nil
         if uiActive then
             log.info("node display: %s", tostring(displayName))
+        else
+            log.info("no monitor attached to this node; the terminal is its only output")
         end
     else
         renderer = resolveDisplay()
@@ -557,6 +559,26 @@ function app.masterLine()
     return "NOT HEARD - nobody is answering on this protocol"
 end
 
+--- What this node is drawing on, if anything.
+--
+-- A node draws on a monitor when it has one, and the failure is silent by
+-- nature: a monitor BaseOS never found stays exactly as blank as one it chose
+-- not to use. This line is the difference between the two.
+function app.displayLine()
+    if uiActive and displayName then
+        local width, height = 0, 0
+        if renderer then width, height = renderer:size() end
+        return ("%s (%dx%d)"):format(tostring(displayName), width, height)
+    end
+
+    local monitor = peripheralManager.get("mainMonitor")
+        or peripheralManager.firstOfType("monitor")
+    if monitor then
+        return ("%s is attached but was not in use at boot - reboot"):format(monitor.name())
+    end
+    return "none - CC sees no monitor here ('scan' lists what it does see)"
+end
+
 --- Messages thrown away, which is what a mismatched secret looks like.
 function app.refusedLine()
     local stats = network.stats()
@@ -594,6 +616,7 @@ function app.printNodeStatus()
             -- answered by the two lines below.
             "master:  " .. app.masterLine(),
             "refused: " .. app.refusedLine(),
+            "display: " .. app.displayLine(),
             "uptime:  " .. util.formatDuration(app.uptime()),
             "",
             "modules:",

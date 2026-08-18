@@ -19,7 +19,11 @@ local STALE_AFTER = 15
 function template.create(instance)
     local remote = {
         id = instance.id,
-        name = instance.name or instance.moduleId,
+        -- Qualified with the node it runs on. Every computer runs a module
+        -- called "System", so a base with two of them used to show two rows
+        -- reading "System" and no way to tell which was which without opening
+        -- both and comparing computer ids.
+        name = (instance.name or instance.moduleId) .. " @" .. instance.node,
         icon = instance.icon,
         description = "Runs on node '" .. instance.node .. "'",
         node = instance.node,
