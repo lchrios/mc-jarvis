@@ -62,6 +62,7 @@ cambió, no el proyecto entero.
 | `version` | Qué tienes instalado, sin tocar la red |
 | `scan` | Qué periféricos ve el ordenador y qué puede leer de ellos |
 | `probe` | Llama a los métodos de Advanced Peripherals y enseña qué responde |
+| `net` | Diagnóstico de rednet: modems, quién habla y si se le acepta |
 
 Tu `config/` y tu `data/` **no** se sobrescriben nunca. La versión instalada, la
 rama y el commit se ven en el tile **CENTRAL HUB**.
@@ -96,7 +97,7 @@ El instalador lo lanza solo en un ordenador nuevo. En todos corre el mismo
 | Rol | Qué hace |
 | --- | --- |
 | **Master** | UI táctil, agrega todo, manda acciones a los nodos |
-| **Nodo** | Sin pantalla. Lee *sus* periféricos y publica su estado cada 3 s |
+| **Nodo** | Lee *sus* periféricos y publica su estado cada 3 s |
 | **Display** | Un monitor en cualquier punto de la base, fijo en una vista |
 
 **Los datos viven en el nodo.** El master nunca lee un periférico remoto:
@@ -108,6 +109,68 @@ alerta, en vez de mostrar números viejos como si fueran de ahora.
 
 Los nodos necesitan un **modem** (inalámbrico, o cableado con cable hasta el
 master). La red se enciende sola en cuanto eliges rol con `setup`.
+
+### La pantalla de un nodo
+
+Un nodo **con monitor lo usa**. No dibuja el mosaico de un display — eso resume
+varios ordenadores, y un nodo solo tiene que hablar de sí mismo — sino su
+trabajo en tres bandas:
+
+```
+ POWER                                                        OK
+ [##############################################        ]   78%
+ Stored: 1.5M FE   Capacity: 2.0M FE   Throughput: 240 FE/t
+
+ Charge over time
+  _..--''''--..__..--''''
+ 
+ DEVICE                                         CHARGE     STORED
+  powah:energy_cell_nitro_0                        78%       1.5M
+  powah:energy_cell_0                              41%        12k
+
+      NEXT             MODULES              REDNET
+```
+
+Arriba las cifras (sin repetir lo que ya dicen la barra y la lista de abajo),
+en medio el histórico de la primera métrica con muestras, y abajo **los
+dispositivos reales** con scroll: tocas una celda y sale su lectura completa.
+`NEXT` cambia de módulo, `REDNET` abre el diagnóstico de red desde el propio
+nodo, que es donde estás parado cuando preguntas por qué no llega al master.
+
+Si el monitor es pequeño la barra de botones desaparece y esas filas se las
+queda la lista; si no hay monitor, el nodo sigue siendo headless y su terminal
+es la página de estado — y ahí dice si ha oído al master, cuántos mensajes se
+rechazaron y qué está dibujando.
+
+### Ver la red: quién habla con quién
+
+`NODES` contesta *qué ordenadores reportan*. La pregunta de debajo — *si este
+equipo puede hablar con alguien* — la contesta el botón **REDNET**:
+
+| Sección | Qué dice |
+| --- | --- |
+| MODEMS | Cada modem, si es inalámbrico o de cable, y si rednet está abierto **en él** |
+| HEARD | Quién se oye: nombre, id, rol, hace cuánto y round-trip en ms |
+| REFUSED | Quién habla pero **no se le acepta**, con el motivo y qué hacer |
+| TRAFFIC | Los últimos 40 mensajes, de entrada y de salida |
+| COUNTERS | Enviados, recibidos, rechazados por motivo, y los que no iban dirigidos aquí |
+
+**REFUSED es la razón de que esta pantalla exista.** Un secreto distinto y un
+modem desenchufado producen exactamente el mismo silencio en la lista de nodos;
+aquí no se parecen en nada. `PING` pregunta a todos ahora mismo en vez de
+esperar al siguiente latido, `REQUEST` pide a los nodos que publiquen ya.
+
+Lo mismo desde la shell, con BaseOS parado — que es cuando más falta hace:
+
+```
+net
+```
+
+Enseña identidad, protocolo y modems, y luego escucha unos segundos imprimiendo
+cada mensaje con su veredicto (`ok` o `REFUSED` y por qué). También `net ping`,
+`net listen 20` y `net hosts`. Imprime una **huella de 6 caracteres del
+secreto**: si no coincide en los dos ordenadores, ahí está el problema — y la
+huella no revela el secreto.
 
 ### Pantallas repartidas por la base
 
@@ -121,6 +184,7 @@ Un **display** es un ordenador con monitor y nada más: no controla, solo enseñ
 | `STORAGE` | Solo almacenamiento |
 | `FARMS` | Cualquier cosa tipo granja |
 | `ALERTS` / `NODES` | La lista de alertas o la salud de los nodos |
+| `REDNET` | Modems, quién se oye y qué se rechaza |
 
 Con un módulo lo enseña en grande con sus métricas y su gráfica; con varios, en
 mosaico. Si lo tocas puedes navegar, y vuelve solo a su vista al cabo de un
@@ -382,6 +446,12 @@ la config por defecto.
 * UI para monitor táctil: dashboard con el plano de la base, tiles clicables,
   pantalla de detalle genérica, lista de módulos, alertas, periféricos y logs.
   Se adapta a cualquier tamaño de monitor y a monitores monocromos.
+* Desglose por dispositivo en los módulos que agregan cosas, y viaja al master
+  dentro de la instantánea del nodo.
+* Pantalla de red (`REDNET`) y herramienta `net`: modems, quién se oye, quién es
+  rechazado y por qué, tráfico y contadores.
+* Los logs se filtran por nivel y una línea se abre entera, envuelta y con
+  scroll, en vez de quedarse recortada por el ancho del monitor.
 * Módulos: `system`, `power`, `storage` y `demo_farm` (granja simulada para
   probar la UI sin depender de máquinas reales).
 * Plantilla `farm`: granjas reales declaradas solo con configuración — lee el
@@ -439,6 +509,35 @@ sistema abre su detalle, y la barra inferior lleva a las pantallas que se usan a
 diario. En monitores estrechos el feed de actividad se retira antes que nada
 esencial.
 
+### El desglose por dispositivo
+
+Un módulo publica totales — 1.5M FE, 12.4k items — y la pregunta siguiente es
+siempre *de dónde salen*. Los módulos que agregan cosas (`power`, `storage`)
+publican también la lista de las cosas agregadas, y su pantalla de detalle la
+enseña con scroll:
+
+```
+ +-- Total -----------------------------------------------------+
+ | [############################################         ]  78% |
+ | Stored: 1.5M FE   Capacity: 2.0M FE            4 device(s)    |
+ +---------------------------------------------------------------+
+ DEVICE                                          CHARGE    STORED
+  powah:energy_cell_nitro_0                         78%      1.5M
+  powah:energy_cell_0                               41%       12k
+  mekanism:induction_matrix_0                        9%      2.1k
+```
+
+Tocas una fila y sale todo lo que ese bloque reporta: capacidad, transferencia,
+temperatura, combustible, y por qué adaptador se lee. En `storage` el bridge va
+primero — si la base tiene uno, lo demás son barriles — con sus bytes de celda,
+sus tipos y su consumo.
+
+**El desglose viaja.** Va dentro de la instantánea que el nodo manda al master,
+así que la lista de celdas se ve igual en el monitor que está junto a ellas y en
+el mainframe al otro lado de la base, sin que el master lea nunca un periférico
+remoto. Un módulo nuevo lo consigue devolviendo `detail` — ver
+[docs/MODULE_DEVELOPMENT.md](docs/MODULE_DEVELOPMENT.md).
+
 ### Dispositivos, y cómo se encuentran solos
 
 Botón `DEVICES`: un árbol con todo lo que ve este equipo. Cada fila se despliega
@@ -448,8 +547,8 @@ leer BaseOS de él — o, si no sabe leer nada, te lo dice para que corras
 
 Un **modem** también sale aquí, y dice lo que hace falta saber: si es wireless o
 de cable, si rednet está abierto **en él** (no solo que exista), y cuántos
-periféricos alcanza su cable. Para saber si hay alguien más en la red, la
-primera línea de `NODES`.
+periféricos alcanza su cable. Para saber si hay alguien más en la red,
+`NODES` → `REDNET`.
 
 **No hay que reiniciar para que aparezca un bloque nuevo.** Conectar o
 desconectar llega como evento y se atiende al instante; lo demás lo recoge el

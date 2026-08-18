@@ -239,6 +239,7 @@ periférico reaparece.
 | `status(self)` | tras cada poll y acción | `status[, texto]` |
 | `metrics(self)` | al pintar el detalle | lista de métricas |
 | `tile(self)` | al pintar el dashboard | `{ lines = {...}, gauge = 0..1 }` |
+| `detail(self)` | al construir la instantánea | desglose por dispositivo |
 | `actions(self)` | al pintar el detalle | lista de acciones |
 | `detailScreen(params)` | si quieres pantalla propia | una `Screen` |
 
@@ -259,6 +260,45 @@ Valores de `status` que la UI colorea: `running`/`ok`/`online` (verde),
 Las de tipo `percent` se pintan como barra de progreso; el resto como fila
 `etiqueta ......... valor`. También se acepta un mapa simple
 (`{ Temperatura = 812 }`), que se ordena alfabéticamente.
+
+### Desglose por dispositivo
+
+`metrics` da los totales; `detail` da las cosas que se sumaron para llegar a
+ellos. Un módulo que agrega periféricos (celdas, barriles, tanques) lo devuelve
+y se lo lleva de gratis: la pantalla
+[`ui/screens/device_breakdown.lua`](../src/ui/screens/device_breakdown.lua) lo
+pinta con scroll, y una fila tocada abre sus `fields`.
+
+```lua
+function mi_modulo.detail(self)
+    return {
+        columns = { "CHARGE", "STORED" },     -- cabeceras de las dos columnas
+        rows = {
+            {
+                id = "powah:energy_cell_0",
+                name = "powah:energy_cell_0",
+                percent = 0.78,               -- pinta la fila de color
+                value = "1.5M",               -- columna derecha, ya formateada
+                status = "running",           -- opcional, manda sobre percent
+                fields = {                    -- lo que sale al tocarla
+                    { label = "Stored", value = "1.5M FE" },
+                    { label = "Capacity", value = "2.0M FE" },
+                },
+            },
+        },
+    }
+end
+
+function mi_modulo.detailScreen(params)
+    return require("ui.screens.device_breakdown").new(params)
+end
+```
+
+**Solo cadenas y números.** El desglose viaja dentro de la instantánea que un
+nodo manda al master, y por rednet no cruza una función: formatea en el
+ordenador que tiene los periféricos delante, que además es el único que sabe de
+qué unidades habla. Por lo mismo, calcúlalo en `poll` y guárdalo en `self`; que
+`detail` solo dé forma a lo que ya se leyó.
 
 ### Acciones
 

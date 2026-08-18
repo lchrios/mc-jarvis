@@ -497,8 +497,12 @@ toca. Lo escribe `setup.lua`, lo borra `reset.lua` y nadie más.
 
 * `core.identity` lee y escribe el fichero y define los perfiles del asistente.
 * `core.app` se ramifica en el arranque: un **master** monta display, tema,
-  navegación y pantallas; un **nodo** se salta todo eso (`uiActive = false`),
-  no enruta toques y pinta un resumen de texto en su terminal.
+  navegación y pantallas. Un **nodo** monta lo mismo *si tiene monitor* y
+  arranca en `node_view`; si no lo tiene se queda headless y no enruta toques.
+  Su terminal es la página de estado en cualquiera de los dos casos, y por eso
+  nunca se le ofrece como pantalla de repuesto.
+* Publicar o recolectar depende del **rol**, no de si hay pantalla (`isNode`):
+  un nodo con monitor sigue siendo un nodo y sigue publicando.
 * Los módulos que carga salen de `identity.modules`, con `config/modules.lua`
   como respaldo. Las instancias de plantilla (granjas) se añaden siempre.
 * Un ordenador sin identidad se asume **master**, así que una instalación de un
@@ -525,8 +529,14 @@ NODO                                    MASTER
 
 * Es **push**, no polling: el nodo emite solo. `state.request` existe únicamente
   para que un master recién arrancado no espere al siguiente tick.
-* `modules.remote` es una plantilla: su `metrics`, `status` y `tile` salen de la
-  última instantánea en `core.state`, y sus acciones se reenvían por rednet.
+* `modules.remote` es una plantilla: su `metrics`, `status`, `tile` y `detail`
+  salen de la última instantánea en `core.state`, y sus acciones se reenvían por
+  rednet. Se llama `<módulo> @<nodo>`: cada ordenador tiene un módulo `system`,
+  y dos filas con el mismo nombre no son ninguna de las dos.
+* **Lo que cruza es texto.** Una función no sobrevive a rednet, así que el nodo
+  renderiza sus métricas antes de mandarlas (`metric.text`) y su desglose por
+  dispositivo ya viene formateado. Por eso el master puede listar las celdas de
+  un nodo una a una sin leer jamás un periférico remoto.
 * Si un nodo calla más de `staleAfter` (15 s), se marca offline, sus módulos
   pasan a `OFFLINE`, sus acciones se desactivan y se levanta una alerta.
 * `services.snapshot` vuelca a `data/snapshot.dat` cada 60 s y restaura al
@@ -549,6 +559,31 @@ Además cada mensaje se republica en el bus como `network.message.<tipo>`.
 Hay latidos periódicos y detección de nodos caídos (`network.peer_lost`). Ningún
 módulo toca `rednet` directamente, así que mover un módulo a otro ordenador no
 obliga a reescribirlo.
+
+### Qué se puede observar
+
+El transporte lleva su propia contabilidad, porque el modo de fallo dominante de
+esta capa es **silencioso**: un secreto mal copiado y un modem desenchufado se
+ven exactamente igual desde arriba (nadie reporta), y no se pueden distinguir
+sin mirar lo que se está tirando.
+
+| Llamada | Qué da |
+| --- | --- |
+| `network.info()` | Estado, hostname, protocolo, rol, si firma, contadores |
+| `network.modems()` | Cada modem: cableado o no, y si rednet está abierto **en él** |
+| `network.peerList()` | Quién se ha oído, con `lastSeen`, `messages` y `rtt` |
+| `network.strangers()` | Quién fue **rechazado**, con el motivo y cuántas veces |
+| `network.traffic()` | Los últimos 40 mensajes, entrada y salida |
+| `network.discover()` | Pregunta ahora en vez de esperar al siguiente latido |
+
+`node.discover` era una constante que nadie contestaba; ahora todo ordenador
+responde con `node.hello` devolviendo el `at` que le mandaron, y quien preguntó
+mide el round trip sin que ninguno de los dos tenga que fiarse del reloj del
+otro.
+
+Encima de eso, dos consumidores: la pantalla `ui/screens/network.lua` y el
+programa `net`, que hace lo mismo desde la shell con BaseOS parado — que es
+justo cuando la pantalla no está disponible.
 
 ### Firma de mensajes
 
