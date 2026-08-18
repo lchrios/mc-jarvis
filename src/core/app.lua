@@ -127,6 +127,9 @@ local function registerScreens()
     navigation.register("display_view", function(params)
         return require("ui.screens.display_view").new(params)
     end)
+    navigation.register("node_view", function(params)
+        return require("ui.screens.node_view").new(params)
+    end)
     navigation.register("map", function(params)
         return require("ui.screens.base_map").new(params)
     end)
@@ -481,13 +484,12 @@ function app.boot(options)
         end
         app.startReturnHome(config.get("system.ui.returnHomeAfter", 60))
     elseif isNode then
-        -- The same view a display draws, of this node's own modules: it holds
-        -- no telemetry from anybody else, so there is nothing else to show.
-        -- Touching it can still walk into the detail screens, and it comes
+        -- Its own job in full: totals, the trend, and the devices behind them.
+        -- A display's grid summarises several computers; a node only has
+        -- itself to talk about, and the room it is standing in wants the
+        -- detail. Touching it can walk into the other screens, and it comes
         -- back on its own afterwards.
-        navigation.reset("display_view", {
-            view = me.view or { title = me.name, modules = "*" },
-        })
+        navigation.reset("node_view", { title = me.name })
         app.startReturnHome(config.get("system.ui.returnHomeAfter", 60))
     else
         navigation.reset(config.get("system.ui.homeScreen", "dashboard"), {})
