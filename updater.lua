@@ -58,10 +58,58 @@ local function matchesPrefix(path, prefixes)
     return false
 end
 
+--- Minutes until GitHub will answer again, from the headers of the refusal.
+local function rateLimitMinutes(response)
+    if not response or not response.getResponseHeaders then return nil end
+
+    local ok, headers = pcall(response.getResponseHeaders)
+    if not ok or type(headers) ~= "table" then return nil end
+
+    local reset = tonumber(headers["x-ratelimit-reset"] or headers["X-RateLimit-Reset"])
+    if not reset then return nil end
+
+    return math.max(1, math.ceil((reset - os.epoch("utc") / 1000) / 60))
+end
+
+--- Rate limiting is not a network failure and must not read like one.
+--
+-- Only the file list goes through GitHub's *API*, which allows 60 requests an
+-- hour per address without a token - and on a server that address is shared by
+-- everyone playing. Every file after it comes from raw.githubusercontent, which
+-- is not part of that budget, so "GitHub is unreachable" would be wrong twice.
+local function failRateLimited(minutes)
+    printError("GitHub is rate limiting this address.")
+    print("")
+    print("Only the file list goes through GitHub's API, and it allows 60")
+    print("requests an hour per address. On a server that address is shared")
+    print("with everyone else playing.")
+    print("")
+    if minutes then
+        print("It resets in " .. minutes .. " minute(s). Nothing was changed.")
+    else
+        print("It resets within the hour. Nothing was changed.")
+    end
+    print("Retrying sooner is harmless but will not help.")
+    error("", 0)
+end
+
 local function fetch(url, description, optional)
     -- GitHub rejects requests without a User-Agent.
-    local response, err = http.get(url, { ["User-Agent"] = "BaseOS-Updater" })
+    local response, err, refused = http.get(url, { ["User-Agent"] = "BaseOS-Updater" })
     if not response then
+        if refused then
+            local limited = tostring(err):lower():find("rate limit", 1, true) ~= nil
+            if not limited and refused.getResponseCode then
+                local okCode, code = pcall(refused.getResponseCode)
+                limited = okCode and code == 403
+            end
+
+            -- Read the headers before closing: they carry the reset time.
+            local minutes = limited and rateLimitMinutes(refused) or nil
+            pcall(refused.close)
+
+            if limited and not optional then failRateLimited(minutes) end
+        end
         if optional then return nil end
         fail("Could not fetch " .. description .. ": " .. tostring(err))
     end

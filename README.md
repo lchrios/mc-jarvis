@@ -67,6 +67,14 @@ cambió, no el proyecto entero.
 Tu `config/` y tu `data/` **no** se sobrescriben nunca. La versión instalada, la
 rama y el commit se ven en el tile **CENTRAL HUB**.
 
+> **`GitHub is rate limiting this address`.** No es un fallo tuyo ni de la red.
+> La lista de ficheros es lo único que pasa por la *API* de GitHub, que permite
+> 60 peticiones por hora y por dirección — y en un servidor esa dirección la
+> comparten todos los que juegan. Los ficheros en sí vienen de
+> `raw.githubusercontent`, que no gasta de esa cuenta. El updater te dice
+> cuántos minutos faltan para que se reponga; no cambia nada mientras tanto y
+> reintentar antes no adelanta nada.
+
 Alternativa sin HTTP: copiar el repositorio a
 `saves/<mundo>/computercraft/computer/<id>/` con `startup.lua` en la raíz.
 
