@@ -83,6 +83,7 @@ src/
                          metric_detail,
                          module_list, alerts, peripherals, logs, log_entry,
                          nodes, network, device_breakdown,
+                         farm_detail, farm_edit,
                          display_view, node_view
   network/
     protocol.lua         Formato de mensaje (sobre + tipos)
@@ -96,6 +97,7 @@ src/
     notifications.lua    Catálogo de avisos (qué se dice, no cómo)
     security.lua         Perfiles y permisos por acción
     layout_store.lua     Plano vigente: override de data/ o config/layout.lua
+    farm_store.lua       Granjas vigentes: override de data/ o config/modules.lua
     alerts.lua           Alertas activas con severidad
     persistence.lua      Guardado/carga en `data/`
     snapshot.lua         Volcado periódico del estado a disco

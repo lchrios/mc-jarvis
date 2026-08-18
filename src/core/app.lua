@@ -28,6 +28,7 @@ local history = require("services.history")
 local activity = require("services.activity")
 local security = require("services.security")
 local rules = require("services.rules")
+local farmStore = require("services.farm_store")
 local notifications = require("services.notifications")
 
 local theme = require("ui.theme")
@@ -147,6 +148,12 @@ local function registerScreens()
     end)
     navigation.register("rules", function(params)
         return require("ui.screens.rules_list").new(params)
+    end)
+    navigation.register("farm_detail", function(params)
+        return require("ui.screens.farm_detail").new(params)
+    end)
+    navigation.register("farm_edit", function(params)
+        return require("ui.screens.farm_edit").new(params)
     end)
     navigation.register("rule_edit", function(params)
         return require("ui.screens.rule_edit").new(params)
@@ -383,6 +390,7 @@ function app.boot(options)
     -- 8. Modules
     context = buildContext(options)
     moduleRegistry.setContext(context)
+    farmStore.setContext(context)
     moduleRegistry.watchPeripherals()
     -- The identity decides which modules this computer runs; config is the
     -- fallback for a custom node and for installs that never ran `setup`.
@@ -390,8 +398,14 @@ function app.boot(options)
     for _, id in ipairs(me.modules or config.get("modules.enabled", {})) do
         moduleEntries[#moduleEntries + 1] = id
     end
-    for _, instance in ipairs(config.get("modules.instances", {})) do
+    -- Template instances that are not farms stay in config; the farms come
+    -- from the store, which is seeded from that same config until the editor
+    -- takes them over.
+    for _, instance in ipairs(farmStore.otherInstances()) do
         moduleEntries[#moduleEntries + 1] = instance
+    end
+    for _, farm in ipairs(farmStore.current()) do
+        moduleEntries[#moduleEntries + 1] = farm
     end
     moduleRegistry.load(moduleEntries, options.require)
 

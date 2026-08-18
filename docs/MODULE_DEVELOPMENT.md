@@ -185,10 +185,22 @@ La plantilla `farm` acepta:
 | `idleAfter` / `alertWhenIdle` | Segundos sin producir para marcarla `IDLE` |
 | `targetRate` | Ritmo esperado, solo informativo |
 | `countItems` | Contar solo estos items, p. ej. `{ "minecraft:oak_log" }` |
+| `spawner` | `{ match = { name = "block_reader_0" } }`: un Block Reader mirando al spawner |
 
-Cada instancia registra sus propios alias (`mob_farm.output`, `mob_farm.control`),
-así que dos granjas nunca se pisan y una puede estar `unavailable` sin afectar a
-la otra.
+Cada instancia registra sus propios alias (`mob_farm.output`, `mob_farm.control`,
+`mob_farm.spawner`), así que dos granjas nunca se pisan y una puede estar
+`unavailable` sin afectar a la otra.
+
+`spawner` es **opcional en los dos sentidos**: la granja funciona sin él, y si
+el Block Reader se rompe la granja sigue midiendo su salida en vez de marcarse
+como averiada. Lo que se saca de él —qué mob, cada cuánto, a qué distancia— va
+en el NBT, que cambia entre versiones y entre mods; se mira donde lo pone cada
+uno y lo que no aparece sencillamente no se enseña, en vez de adivinarlo.
+
+**No hace falta editar este fichero para añadir una granja.** El panel las
+escribe en `data/farms.dat`, sembrado desde estas instancias la primera vez —
+ver la sección de granjas del README. En cuanto el editor guarda una vez, esa
+lista manda sobre la de `config/modules.lua`.
 
 > **Ojo con el ritmo**: se mide por lo que aparece en el buffer entre dos
 > lecturas. Si una tubería lo vacía al instante, el ritmo saldrá bajo. Apunta

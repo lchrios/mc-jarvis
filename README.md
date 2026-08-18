@@ -356,6 +356,79 @@ toca nunca** — igual que el plano del editor. `RESET` borra el override y el
 fichero vuelve a mandar. El motor recoge los cambios al momento: no hace falta
 reiniciar el ordenador para que una regla recién encendida empiece a actuar.
 
+## Granjas
+
+Una granja no es código: es una entrada de configuración que apunta a un cofre
+de salida y, si quieres, a lo que la enciende. Se pueden escribir a mano en
+[config/modules.lua](config/modules.lua), pero lo normal es hacerlo desde el
+panel — **MODULES → NEW FARM**, o **EDIT** en la pantalla de una que ya exista.
+
+| Campo | Qué se elige |
+| --- | --- |
+| `NAME` | Cómo se llama en el dashboard |
+| `OUTPUT` | El contenedor donde caen los drops, **de una lista de lo que hay conectado** |
+| `SWITCH` | Nada, la redstone del propio ordenador, o un Redstone Integrator (y por qué cara) |
+| `COUNT` | Qué items cuentan como producción, elegidos **de lo que hay ahora en el buffer** |
+| `FULL` | A qué nivel de buffer salta la alerta de atascada |
+| `IDLE` | Cuánto sin producir antes de avisar |
+| `SPAWNER` | Un Block Reader mirando al spawner |
+
+Nada se escribe a mano: cada campo abre una lista de lo que este ordenador ve
+de verdad, así que un nombre de item o de periférico no se puede escribir mal.
+Se guarda en `data/farms.dat` y **se aplica al momento** — la granja se vuelve a
+montar con los ajustes nuevos sin reiniciar.
+
+La primera vez esa lista se siembra con las granjas que tuvieras en
+`config/modules.lua`, así que no se pierde nada; a partir de ahí manda el
+editor. Para volver al fichero, borra `data/farms.dat`.
+
+### Spawners custom
+
+`SPAWNER` es lo que hace útil el panel para una granja hecha a mano. Pones un
+**Block Reader** de Advanced Peripherals mirando al spawner, lo eliges en el
+campo, y la granja pasa a decir **qué mob hay dentro** (en su tile y en sus
+métricas) además de cuánto produce.
+
+```
+ MOB FARM
+ RUNNING              124 it/min
+ zombie
+```
+
+Sin él, una granja parada y un spawner mal configurado se ven igual: cero. Con
+él, el tile te dice de cuál de los cuatro spawners de la sala está hablando.
+
+Lo que se lee del spawner depende del mod y de la versión, así que es *best
+effort*: se busca el mob donde lo pone vanilla, donde lo pone la versión nueva y
+donde lo pone Apotheosis, y lo que no aparezca no se enseña. Si el Block Reader
+se rompe, la granja sigue midiendo su salida — el spawner es un extra, no un
+requisito.
+
+### La pantalla de una granja
+
+```
+ RUNNING                            Items/min: 124   In buffer: 412
+
+ [######################################              ]
+
+ buffer 71%   19/27 slots
+
+ Items/min over time
+  _..--''''--..__..--''''
+
+ IN THE BUFFER                                  SHARE     COUNT
+  Rotten Flesh                                    62%       256
+  Bone                                            28%       115
+  Iron Ingot                                       9%        38
+
+      START            STOP             EDIT
+```
+
+Arriba el estado y el ritmo, en medio el histórico, y abajo **qué hay en el
+buffer**: "412 items" dice que la granja va; esta lista dice si son los drops
+que querías o basura. Si has elegido `COUNT`, lo que no cuenta sale en gris —
+sigue ocupando sitio en el cofre, y por eso se ve.
+
 ## Avisos por chat
 
 El Chat Box es la única parte de BaseOS que te encuentra a ti en vez de esperar
@@ -464,7 +537,9 @@ la config por defecto.
   probar la UI sin depender de máquinas reales).
 * Plantilla `farm`: granjas reales declaradas solo con configuración — lee el
   cofre de salida, mide items/min, avisa cuando el buffer se llena y arranca o
-  para la granja por redstone o Redstone Integrator.
+  para la granja por redstone o Redstone Integrator. Se crean y se editan
+  **desde el panel**, con el desglose de lo que hay en el buffer y el mob del
+  spawner cuando hay un Block Reader mirándolo.
 * Adaptadores genéricos (inventarios, energía, fluidos) y esqueletos para AE2,
   Powah y Advanced Peripherals. Los de AP y los bridges están verificados contra
   los `@LuaFunction` del jar de AdvancedPeripherals 0.7.62b.

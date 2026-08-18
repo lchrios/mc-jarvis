@@ -80,6 +80,32 @@ function DeviceBreakdown:showRow(row)
     }))
 end
 
+--- Say something in place of the figures for a few seconds. A refused action
+--- has to land somewhere the eye already is.
+function DeviceBreakdown:say(message)
+    self.message = message
+    self.messageAt = util.nowMs()
+    self:invalidate()
+end
+
+--- The module's actions, ready for the bar. Empty for most modules.
+function DeviceBreakdown:actionSpecs()
+    local specs = {}
+    for _, action in ipairs(registry.actions(self.moduleId)) do
+        specs[#specs + 1] = {
+            label = action.label,
+            style = action.style,
+            enabled = action.enabled,
+            run = function()
+                local ok, err = registry.invoke(self.moduleId, action.id)
+                if not ok then self:say(tostring(err)) end
+                self:requestLayout()
+            end,
+        }
+    end
+    return specs
+end
+
 function DeviceBreakdown:onLayout(x, y, w, h)
     local snapshot = self:snapshot()
     local detail = snapshot.detail
@@ -114,9 +140,15 @@ function DeviceBreakdown:onLayout(x, y, w, h)
     self:add(self.countLabel)
 
     ---------------------------------------------------------------- devices
+    -- A module's own actions belong here too: on a remote farm this is the
+    -- screen its buffer is on, and START/STOP with the reason for pressing it
+    -- in front of you beats going back out to the generic detail view.
+    local specs = self:actionSpecs()
+    local actionRows = (#specs > 0 and h >= 18) and Screen.ACTION_BAR or 0
+
     local listY = y + SUMMARY_HEIGHT
     local listWidth = w - 2
-    local listHeight = h - SUMMARY_HEIGHT - 1
+    local listHeight = h - SUMMARY_HEIGHT - 1 - actionRows
     if listHeight < 2 then return end
 
     local columns = (detail and detail.columns) or {}
@@ -137,6 +169,8 @@ function DeviceBreakdown:onLayout(x, y, w, h)
     })
     self.list:setBounds(x + 1, listY + 1, listWidth, listHeight)
     self:add(self.list)
+
+    if actionRows > 0 then self:actionBar(x + 1, y, listWidth, h, specs) end
 end
 
 function DeviceBreakdown:update()
@@ -149,9 +183,13 @@ function DeviceBreakdown:update()
     end
 
     if self.figures then
-        self.figures:setText(util.truncate(
+        local fresh = self.message and (util.nowMs() - (self.messageAt or 0)) / 1000 < 6
+        if not fresh then self.message = nil end
+
+        self.figures:setText(util.truncate(self.message or
             summary.headline(snapshot, { hasGauge = self.hasGauge, rowCount = #rows, limit = 3 }),
             self.figuresWidth or 40))
+        self.figures.fg = self.message and "statusWarn" or "textDim"
     end
 
     if self.countLabel then

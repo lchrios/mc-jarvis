@@ -54,6 +54,19 @@ local DEFAULTS = {
 
     -- Only count these item names, e.g. { "minecraft:rotten_flesh" }.
     countItems = nil,
+
+    -- Optional: a Block Reader looking at the spawner that drives the farm.
+    --
+    --   spawner = { match = { type = "block_reader" } }
+    --
+    -- Mob farms are built around a spawner and the question in front of the
+    -- monitor is always "what is in it and is it running", which no amount of
+    -- counting the output answers - an empty buffer looks the same whether the
+    -- spawner is a custom one nobody configured or the mobs are simply not
+    -- reaching it. What a spawner reports varies by mod and version, so
+    -- everything read here is best effort and missing fields are left out
+    -- rather than guessed.
+    spawner = nil,
 }
 
 ---------------------------------------------------------------------------
@@ -132,6 +145,73 @@ local function countMatching(items, filter)
 end
 
 ---------------------------------------------------------------------------
+-- The spawner behind the farm
+---------------------------------------------------------------------------
+
+--- Pull a mob id out of whatever shape this version's spawner NBT has.
+--
+-- Vanilla has moved this twice (`SpawnData.id`, then `SpawnData.entity.id`)
+-- and modded spawners add their own; Apotheosis keeps the vanilla layout but
+-- may carry several entries in `SpawnPotentials`. Rather than know all of
+-- them, look where each has put it and give up quietly.
+local function mobFromData(data)
+    if type(data) ~= "table" then return nil end
+
+    local spawn = data.SpawnData or data.spawnData
+    if type(spawn) == "table" then
+        if type(spawn.entity) == "table" and spawn.entity.id then return spawn.entity.id end
+        if spawn.id then return spawn.id end
+        if type(spawn.data) == "table" and type(spawn.data.entity) == "table" then
+            return spawn.data.entity.id
+        end
+    end
+
+    local potentials = data.SpawnPotentials or data.spawnPotentials
+    if type(potentials) == "table" and type(potentials[1]) == "table" then
+        local first = potentials[1]
+        local entity = first.data and first.data.entity or first.Entity or first.entity
+        if type(entity) == "table" and entity.id then return entity.id end
+    end
+
+    return nil
+end
+
+--- Strip the namespace: "minecraft:zombie" reads as "zombie" on a tile.
+local function shortMobName(id)
+    if type(id) ~= "string" then return nil end
+    return (id:match("([^:]+)$") or id):gsub("_", " ")
+end
+
+--- Everything the block reader can say about the spawner, or nil.
+local function readSpawner(self)
+    if not self.settings.spawner then return nil end
+
+    local reader = self.ctx.peripherals.get(self.id .. ".spawner")
+    if not reader then return nil end
+
+    local info = {}
+
+    local blockName = reader.call("getBlockName")
+    if type(blockName) == "string" then info.block = blockName end
+
+    local data = reader.call("getBlockData")
+    if type(data) == "table" then
+        info.mob = mobFromData(data)
+        -- Vanilla counts down between spawns; a spawner nobody is standing
+        -- near sits at its maximum and never moves.
+        local delay = tonumber(data.Delay or data.delay)
+        if delay then info.delay = delay end
+        local range = tonumber(data.RequiredPlayerRange or data.requiredPlayerRange)
+        if range then info.range = range end
+        local count = tonumber(data.SpawnCount or data.spawnCount)
+        if count then info.count = count end
+    end
+
+    if not info.block and not info.mob then return nil end
+    return info
+end
+
+---------------------------------------------------------------------------
 -- Template
 ---------------------------------------------------------------------------
 
@@ -173,6 +253,15 @@ function template.create(instance)
         farm.peripherals[#farm.peripherals + 1] = controlMatcher
     end
 
+    -- Optional by definition: a farm whose block reader is missing is still a
+    -- farm, and marking it unavailable would hide the output it is producing.
+    if settings.spawner then
+        local spawnerMatcher = util.deepCopy(settings.spawner.match or { type = "block_reader" })
+        spawnerMatcher.alias = farm.id .. ".spawner"
+        spawnerMatcher.optional = true
+        farm.peripherals[#farm.peripherals + 1] = spawnerMatcher
+    end
+
     function farm.setup(self, ctx)
         self.ctx = ctx
         self.itemsPerMinute = 0
@@ -200,6 +289,8 @@ function template.create(instance)
         local items = output.items()
         local now = util.nowMs()
 
+        self.contents = items
+        self.spawnerInfo = readSpawner(self)
         self.itemCount = countMatching(items, self.settings.countItems)
         self.slotCount = output.slots()
         self.slotsUsed = #items
@@ -280,14 +371,102 @@ function template.create(instance)
                 format = function(value) return util.formatDuration(value) .. " ago" end,
             }
         end
+
+        local spawner = self.spawnerInfo
+        if spawner then
+            if spawner.mob then
+                metrics[#metrics + 1] = { id = "mob", label = "Spawns",
+                    value = shortMobName(spawner.mob) }
+            end
+            if spawner.range then
+                metrics[#metrics + 1] = { id = "range", label = "Player range",
+                    value = spawner.range, unit = "blocks" }
+            end
+        elseif self.settings.spawner then
+            metrics[#metrics + 1] = { id = "mob", label = "Spawner",
+                value = "not readable" }
+        end
+
         return metrics
     end
 
+    --- What is sitting in the output buffer, one row per item.
+    --
+    -- "412 items" says the farm works; it does not say whether the mob drops
+    -- you came for are in there or whether the buffer is 90% rotten flesh. On
+    -- a custom spawner that is the whole question, so the answer has to be a
+    -- list and not a total.
+    function farm.detail(self)
+        local totals, order = {}, {}
+
+        for _, item in ipairs(self.contents or {}) do
+            local entry = totals[item.name]
+            if not entry then
+                entry = { name = item.name, label = item.displayName or item.name,
+                          count = 0, slots = 0 }
+                totals[item.name] = entry
+                order[#order + 1] = entry
+            end
+            entry.count = entry.count + item.count
+            entry.slots = entry.slots + 1
+        end
+
+        -- Most of it first: the thing filling the buffer is the thing you came
+        -- to see, and it is rarely the thing sorted first alphabetically.
+        table.sort(order, function(a, b)
+            if a.count ~= b.count then return a.count > b.count end
+            return a.name < b.name
+        end)
+
+        local counted = self.settings.countItems and {} or nil
+        for _, name in ipairs(self.settings.countItems or {}) do counted[name] = true end
+
+        local total = 0
+        for _, entry in ipairs(order) do total = total + entry.count end
+
+        local rows = {}
+        for _, entry in ipairs(order) do
+            local fields = {
+                { label = "Item", value = entry.name },
+                { label = "Count", value = util.formatNumber(entry.count) },
+                { label = "Stacks", value = tostring(entry.slots) },
+                { label = "Share", value = total > 0
+                    and util.formatPercent(entry.count / total) or "-" },
+            }
+            if counted then
+                fields[#fields + 1] = { label = "Counted",
+                    value = counted[entry.name] and "yes, this is the rate" or "no, ignored" }
+            end
+
+            rows[#rows + 1] = {
+                id = entry.name,
+                name = entry.label,
+                -- Share of the buffer, so the row's colour tracks what is
+                -- taking the space rather than how full the barrel is.
+                percent = total > 0 and (entry.count / total) or nil,
+                value = util.formatNumber(entry.count),
+                status = (counted and not counted[entry.name]) and "idle" or nil,
+                fields = fields,
+            }
+        end
+
+        return { columns = { "SHARE", "COUNT" }, rows = rows }
+    end
+
+    --- Its own screen: the rate over time, the buffer, and what is in it.
+    function farm.detailScreen(params)
+        return require("ui.screens.farm_detail").new(params)
+    end
+
     function farm.tile(self)
-        return {
-            lines = { math.floor((self.itemsPerMinute or 0) + 0.5) .. " it/min" },
-            gauge = self.buffer,
-        }
+        local lines = { math.floor((self.itemsPerMinute or 0) + 0.5) .. " it/min" }
+
+        -- Worth the second line on a mob farm: which of the four spawners in
+        -- the room this tile is about, without opening it.
+        local mob = self.spawnerInfo and shortMobName(self.spawnerInfo.mob)
+        if mob then lines[#lines + 1] = mob end
+
+        return { lines = lines, gauge = self.buffer }
     end
 
     function farm.actions(self)

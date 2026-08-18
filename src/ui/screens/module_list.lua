@@ -42,8 +42,17 @@ function ModuleList:onLayout(x, y, w, h)
             self.context.navigation.push("module_detail", { moduleId = record.id })
         end,
     })
-    self.list:setBounds(x + 1, y, width, h)
+    self.list:setBounds(x + 1, y, width, math.max(1, h - Screen.ACTION_BAR))
     self:add(self.list)
+
+    -- The only module you can add from the panel: a farm is configuration,
+    -- not code, and this is the list you are looking at when you notice the
+    -- new one is missing.
+    self:actionBar(x + 1, y, width, h, {
+        { label = "NEW FARM", style = "primary", run = function()
+            self.context.navigation.push("farm_edit", {})
+        end },
+    })
 end
 
 function ModuleList:update()
