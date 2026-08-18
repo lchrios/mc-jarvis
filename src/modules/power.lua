@@ -179,7 +179,7 @@ end
 
 --- Custom detail view with a scrollable device breakdown.
 function power.detailScreen(params)
-    return require("ui.screens.power_detail").new(params)
+    return require("ui.screens.device_breakdown").new(params)
 end
 
 function power.tile(self)

@@ -26,6 +26,7 @@ local ProgressBar = require("ui.components.progress_bar")
 local Sparkline = require("ui.components.sparkline")
 local registry = require("modules.registry")
 local history = require("services.history")
+local summary = require("ui.summary")
 local theme = require("ui.theme")
 
 local NodeView = class(Screen)
@@ -174,26 +175,12 @@ end
 -- Layout
 ---------------------------------------------------------------------------
 
---- The headline numbers, minus whatever the rest of the screen already says.
---
--- The gauge is showing the percentage and the list underneath is showing the
--- devices, so a metric that repeats either of them is spending width on
--- something the eye has already read.
 function NodeView:figuresText(hasGauge)
-    local rowCount = #self:rows()
-    local hasDetail = self:snapshot().detail ~= nil
-    local parts = {}
-
-    for _, metric in ipairs(self:snapshot().metrics or {}) do
-        local isPercent = metric.kind == "percent" or metric.percent ~= nil
-        local isRowCount = hasDetail and metric.value == rowCount
-
-        if not (hasGauge and isPercent) and not isRowCount then
-            parts[#parts + 1] = metric.label .. ": " .. registry.formatMetric(metric)
-        end
-        if #parts >= 3 then break end
-    end
-    return table.concat(parts, "   ")
+    return summary.headline(self:snapshot(), {
+        hasGauge = hasGauge,
+        rowCount = #self:rows(),
+        limit = 3,
+    })
 end
 
 function NodeView:onLayout(x, y, w, h)
@@ -235,10 +222,11 @@ function NodeView:onLayout(x, y, w, h)
     self.statusLabel:setBounds(x + 1, y, width, 1)
     self:add(self.statusLabel)
 
-    local hasGauge = type(snapshot.gauge) == "number"
+    local gaugeValue = summary.gauge(snapshot)
+    local hasGauge = gaugeValue ~= nil
     if hasGauge then
         self.gauge = ProgressBar.new({
-            value = snapshot.gauge,
+            value = gaugeValue,
             thresholds = { warn = 0.25, critical = 0.10 },
         })
         self.gauge:setBounds(x + 1, y + 1, width, 1)
@@ -335,8 +323,9 @@ function NodeView:update()
         self.statusLabel:setText(snapshot.statusText or tostring(snapshot.status):upper())
         self.statusLabel.fg = theme.statusColor(snapshot.status)
     end
-    if self.gauge and type(snapshot.gauge) == "number" then
-        self.gauge:setValue(snapshot.gauge)
+    if self.gauge then
+        local gaugeValue = summary.gauge(snapshot)
+        if gaugeValue then self.gauge:setValue(gaugeValue) end
     end
     if self.figures then
         self.figures:setText(util.truncate(self:figuresText(self.figuresHasGauge),

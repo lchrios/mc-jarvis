@@ -74,14 +74,16 @@ src/
     theme.lua            Paleta semántica
     base_layout.lua      Zonas de configuración -> rectángulos
     base_links.lua       Trazado de las conexiones entre zonas
+    summary.lua          Cifras de cabecera de un módulo, en una línea
     components/          label, button, panel, progress_bar, list, modal,
-                         pager, zone_tile
+                         pager, zone_tile, sparkline
     screens/             dashboard, base_map, layout_editor, security,
                          rules_list, rule_edit, chooser, notifications,
                          name_entry, module_detail,
                          metric_detail,
-                         module_list, alerts, peripherals, logs, nodes,
-                         power_detail, display_view
+                         module_list, alerts, peripherals, logs, log_entry,
+                         nodes, network, device_breakdown,
+                         display_view, node_view
   network/
     protocol.lua         Formato de mensaje (sobre + tipos)
     auth.lua             Firma de mensajes con secreto compartido

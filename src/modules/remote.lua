@@ -97,7 +97,7 @@ function template.create(instance)
     function remote.detailScreen(params)
         local snapshot = state.get(statePath)
         if not (snapshot and snapshot.detail) then return nil end
-        return require("ui.screens.power_detail").new(params)
+        return require("ui.screens.device_breakdown").new(params)
     end
 
     function remote.tile(self)
